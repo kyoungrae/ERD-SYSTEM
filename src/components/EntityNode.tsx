@@ -72,7 +72,7 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
     return (
         <div
             onDoubleClick={handleDoubleClick}
-            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group overflow-hidden ${isLocked ? 'border-gray-300 cursor-grab active:cursor-grabbing' : 'border-blue-500 shadow-blue-100'}`}
+            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group ${isLocked ? 'border-gray-300 cursor-grab active:cursor-grabbing' : 'border-blue-500 shadow-blue-100'}`}
         >
             {/* Header */}
             <div className={`px-4 py-2 flex items-center gap-2 text-white ${isLocked ? 'bg-gradient-to-r from-gray-500 to-gray-600 cursor-grab' : 'bg-gradient-to-r from-blue-500 to-blue-600'}`}>
@@ -118,15 +118,25 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                         className={`flex items-center gap-1 py-1 px-2 rounded group/attr transition-colors relative cursor-default ${!isLocked ? 'hover:bg-blue-50' : 'hover:bg-gray-50'}`}
                     >
                         {/* PK Icon/Toggle */}
-                        <button
-                            onClick={(e) => handleUpdateAttribute(e, attr.id, { isPK: !attr.isPK })}
-                            onMouseDown={(e) => !isLocked && e.stopPropagation()}
-                            disabled={isLocked}
-                            className={`${!isLocked ? 'nodrag' : 'pointer-events-auto cursor-grab'} p-1 rounded transition-colors ${attr.isPK ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300'}`}
-                            title={attr.isPK ? "Primary Key (PK)" : "Set as Primary Key (PK)"}
-                        >
-                            <Key size={14} />
-                        </button>
+                        <div className="relative group/tooltip">
+                            <button
+                                onClick={(e) => handleUpdateAttribute(e, attr.id, { isPK: !attr.isPK })}
+                                onMouseDown={(e) => !isLocked && e.stopPropagation()}
+                                disabled={isLocked}
+                                className={`${!isLocked ? 'nodrag' : 'pointer-events-auto cursor-grab'} p-1 rounded transition-colors ${attr.isPK ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300'}`}
+                            >
+                                <Key size={14} />
+                            </button>
+
+                            {/* 즉시 나타나는 커스텀 툴팁 */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none opacity-0 group-hover/tooltip:opacity-100 transition-all duration-150 translate-y-1 group-hover/tooltip:translate-y-0 z-50">
+                                <div className="bg-gray-800/90 backdrop-blur-sm text-white text-[10px] py-1 px-2.5 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-1.5 border border-white/10">
+                                    <span className={`w-1 h-1 rounded-full animate-pulse ${attr.isPK ? 'bg-yellow-400' : 'bg-gray-400'}`} />
+                                    {attr.isPK ? "기본키 (PK)" : "기본키로 설정"}
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-x-[5px] border-x-transparent border-t-[5px] border-t-gray-800/90" />
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Name Input */}
                         <input
@@ -158,15 +168,25 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                         </select>
 
                         {/* FK Toggle */}
-                        <button
-                            onClick={(e) => handleUpdateAttribute(e, attr.id, { isFK: !attr.isFK })}
-                            onMouseDown={(e) => !isLocked && e.stopPropagation()}
-                            disabled={isLocked}
-                            className={`${!isLocked ? 'nodrag' : 'pointer-events-auto cursor-grab'} p-1 rounded transition-colors ${attr.isFK ? 'text-purple-500 bg-purple-50' : 'text-gray-300'}`}
-                            title={attr.isFK ? "Foreign Key (FK)" : "Set as Foreign Key (FK)"}
-                        >
-                            <Link size={14} />
-                        </button>
+                        <div className="relative group/tooltip">
+                            <button
+                                onClick={(e) => handleUpdateAttribute(e, attr.id, { isFK: !attr.isFK })}
+                                onMouseDown={(e) => !isLocked && e.stopPropagation()}
+                                disabled={isLocked}
+                                className={`${!isLocked ? 'nodrag' : 'pointer-events-auto cursor-grab'} p-1 rounded transition-colors ${attr.isFK ? 'text-purple-500 bg-purple-50' : 'text-gray-300'}`}
+                            >
+                                <Link size={14} />
+                            </button>
+
+                            {/* 즉시 나타나는 커스텀 툴팁 */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none opacity-0 group-hover/tooltip:opacity-100 transition-all duration-150 translate-y-1 group-hover/tooltip:translate-y-0 z-50">
+                                <div className="bg-gray-800/90 backdrop-blur-sm text-white text-[10px] py-1 px-2.5 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-1.5 border border-white/10">
+                                    <span className={`w-1 h-1 rounded-full animate-pulse ${attr.isFK ? 'bg-purple-400' : 'bg-gray-400'}`} />
+                                    {attr.isFK ? "외래키 (FK)" : "외래키로 설정"}
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-x-[5px] border-x-transparent border-t-[5px] border-t-gray-800/90" />
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Delete Attr */}
                         {!isLocked && (
@@ -201,30 +221,38 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                 type="source"
                 position={Position.Top}
                 id="top"
-                className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
-                style={{ top: -8 }}
-            />
+                className="!bg-transparent !border-none !w-5 !h-5 flex items-center justify-center !cursor-pointer group/handle"
+                style={{ top: -10 }}
+            >
+                <div className="w-2 h-2 bg-blue-500 border-white border-2 rounded-full transition-all duration-200 shadow-sm pointer-events-none group-hover/handle:bg-green-500 group-hover/handle:scale-150" />
+            </Handle>
             <Handle
                 type="source"
                 position={Position.Bottom}
                 id="bottom"
-                className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
-                style={{ bottom: -8 }}
-            />
+                className="!bg-transparent !border-none !w-5 !h-5 flex items-center justify-center !cursor-pointer group/handle"
+                style={{ bottom: -10 }}
+            >
+                <div className="w-2 h-2 bg-blue-500 border-white border-2 rounded-full transition-all duration-200 shadow-sm pointer-events-none group-hover/handle:bg-green-500 group-hover/handle:scale-150" />
+            </Handle>
             <Handle
                 type="source"
                 position={Position.Left}
                 id="left"
-                className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
-                style={{ left: -8 }}
-            />
+                className="!bg-transparent !border-none !w-5 !h-5 flex items-center justify-center !cursor-pointer group/handle"
+                style={{ left: -10 }}
+            >
+                <div className="w-2 h-2 bg-blue-500 border-white border-2 rounded-full transition-all duration-200 shadow-sm pointer-events-none group-hover/handle:bg-green-500 group-hover/handle:scale-150" />
+            </Handle>
             <Handle
                 type="source"
                 position={Position.Right}
                 id="right"
-                className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
-                style={{ right: -8 }}
-            />
+                className="!bg-transparent !border-none !w-5 !h-5 flex items-center justify-center !cursor-pointer group/handle"
+                style={{ right: -10 }}
+            >
+                <div className="w-2 h-2 bg-blue-500 border-white border-2 rounded-full transition-all duration-200 shadow-sm pointer-events-none group-hover/handle:bg-green-500 group-hover/handle:scale-150" />
+            </Handle>
         </div>
     );
 };

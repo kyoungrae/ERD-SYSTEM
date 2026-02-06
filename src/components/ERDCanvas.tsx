@@ -45,9 +45,10 @@ const ERDCanvas: React.FC = () => {
 
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [editingRelationship, setEditingRelationship] = useState<Relationship | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
 
     // Convert entities to ReactFlow nodes
     useEffect(() => {
@@ -71,39 +72,71 @@ const ERDCanvas: React.FC = () => {
             type: 'erd',
             label: rel.type,
             animated: true,
+            reconnectable: true,
+            hidden: rel.id === reconnectingEdgeId, // Hide while being "moved"
+            interactionWidth: 40,
             style: { stroke: '#3b82f6', strokeWidth: 2 },
         }));
         setEdges(flowEdges);
-    }, [relationships, setEdges]);
+    }, [relationships, setEdges, reconnectingEdgeId]);
 
     const isValidConnection = useCallback((connection: Connection) => {
         if (connection.source === connection.target) return false;
+        return true;
+    }, []);
 
-        // Prevent duplicate relationships between same entities
-        const exists = relationships.some(rel =>
-            (rel.source === connection.source && rel.target === connection.target) ||
-            (rel.source === connection.target && rel.target === connection.source)
+    const onConnectStart = useCallback((_event: any, params: any) => {
+        // Find if any relationship is already using this handle
+        const existingRel = relationships.find(rel =>
+            (rel.source === params.nodeId && rel.sourceHandle === params.handleId) ||
+            (rel.target === params.nodeId && rel.targetHandle === params.handleId)
         );
-
-        return !exists;
+        if (existingRel) {
+            setReconnectingEdgeId(existingRel.id);
+        }
     }, [relationships]);
 
     const onConnect = useCallback(
         (params: Connection) => {
             if (params.source && params.target && params.source !== params.target) {
-                const newRelationship = {
-                    id: `rel_${Date.now()}`,
-                    source: params.source,
-                    target: params.target,
-                    sourceHandle: params.sourceHandle || undefined,
-                    targetHandle: params.targetHandle || undefined,
-                    type: '1:N' as const,
-                };
-                addRelationship(newRelationship);
+                // Use the ID we started dragging, or find by endpoints
+                const targetId = reconnectingEdgeId || relationships.find(rel =>
+                    (rel.source === params.source && rel.target === params.target) ||
+                    (rel.source === params.target && rel.target === params.source)
+                )?.id;
+
+                if (targetId) {
+                    updateRelationship(targetId, {
+                        source: params.source,
+                        target: params.target,
+                        sourceHandle: params.sourceHandle || undefined,
+                        targetHandle: params.targetHandle || undefined,
+                    });
+                } else {
+                    const newRelationship = {
+                        id: `rel_${Date.now()}`,
+                        source: params.source,
+                        target: params.target,
+                        sourceHandle: params.sourceHandle || undefined,
+                        targetHandle: params.targetHandle || undefined,
+                        type: '1:N' as const,
+                    };
+                    addRelationship(newRelationship);
+                }
             }
+            setReconnectingEdgeId(null);
         },
-        [addRelationship]
+        [relationships, reconnectingEdgeId, addRelationship, updateRelationship]
     );
+
+    const onConnectEnd = useCallback(() => {
+        // Delay clearing to allow onConnect to catch it
+        setTimeout(() => setReconnectingEdgeId(null), 100);
+    }, []);
+
+    const onReconnectStart = useCallback((_: any, edge: Edge) => {
+        setReconnectingEdgeId(edge.id);
+    }, []);
 
     const onReconnect = useCallback(
         (oldEdge: Edge, newConnection: Connection) => {
@@ -113,9 +146,14 @@ const ERDCanvas: React.FC = () => {
                 sourceHandle: newConnection.sourceHandle || undefined,
                 targetHandle: newConnection.targetHandle || undefined,
             });
+            setReconnectingEdgeId(null);
         },
         [updateRelationship]
     );
+
+    const onReconnectEnd = useCallback(() => {
+        setReconnectingEdgeId(null);
+    }, []);
 
     const onEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
         const rel = relationships.find(r => r.id === edge.id);
@@ -176,7 +214,7 @@ const ERDCanvas: React.FC = () => {
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                     className={`absolute top-1/2 -translate-y-1/2 z-30 w-5 h-12 bg-white rounded-r-lg shadow-md border border-l-0 border-gray-200 text-gray-400 hover:text-blue-500 hover:w-6 transition-all active:scale-95 flex items-center justify-center ${isSidebarOpen ? '-right-5' : 'left-0'
                         }`}
-                    title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+                    title={isSidebarOpen ? "사이드바 닫기" : "사이드바 열기"}
                 >
                     {isSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                 </button>
@@ -220,7 +258,11 @@ const ERDCanvas: React.FC = () => {
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
+                    onConnectStart={onConnectStart}
+                    onConnectEnd={onConnectEnd}
                     onReconnect={onReconnect}
+                    onReconnectStart={onReconnectStart}
+                    onReconnectEnd={onReconnectEnd}
                     isValidConnection={isValidConnection}
                     onEdgeDoubleClick={onEdgeDoubleClick}
                     onNodeDragStop={onNodeDragStop}
