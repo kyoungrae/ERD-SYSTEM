@@ -84,7 +84,7 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                     onMouseDown={(e) => !isLocked && e.stopPropagation()}
                     disabled={isLocked}
                     className={`${!isLocked ? 'nodrag bg-blue-400/20' : 'bg-transparent pointer-events-none'} border-none focus:ring-0 font-bold text-lg w-full p-0 outline-none placeholder-blue-200 rounded transition-colors disabled:text-white`}
-                    placeholder="Table Name"
+                    placeholder="테이블 명"
                     spellCheck={false}
                 />
 
@@ -136,7 +136,7 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                             onMouseDown={(e) => !isLocked && e.stopPropagation()}
                             disabled={isLocked}
                             className={`${!isLocked ? 'nodrag bg-blue-50' : 'bg-transparent pointer-events-none'} flex-1 border-none focus:ring-0 text-sm outline-none px-1 rounded transition-colors ${attr.isPK ? 'font-bold underline text-blue-900' : 'text-gray-700'} disabled:text-gray-600`}
-                            placeholder="column_name"
+                            placeholder="컬럼 명"
                             spellCheck={false}
                         />
 
@@ -191,33 +191,37 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                         className="nodrag w-full flex items-center justify-center gap-2 py-1.5 border-2 border-dashed border-gray-200 rounded text-gray-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all text-xs font-medium"
                     >
                         <Plus size={14} />
-                        Add Column
+                        컬럼 추가
                     </button>
                 </div>
             )}
 
             {/* Handles for connections */}
             <Handle
-                type="target"
+                type="source"
                 position={Position.Top}
+                id="top"
                 className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
                 style={{ top: -8 }}
             />
             <Handle
                 type="source"
                 position={Position.Bottom}
+                id="bottom"
                 className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
                 style={{ bottom: -8 }}
             />
             <Handle
                 type="source"
                 position={Position.Left}
+                id="left"
                 className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
                 style={{ left: -8 }}
             />
             <Handle
                 type="source"
                 position={Position.Right}
+                id="right"
                 className="!bg-blue-500 !w-3 !h-3 !border-white !border-2"
                 style={{ right: -8 }}
             />

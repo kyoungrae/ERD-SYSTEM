@@ -104,7 +104,10 @@ export const useERDStore = create<ERDStore>((set, get) => ({
             data.relationships.forEach((newRel) => {
                 const exists = newRelationships.some(
                     (r) =>
-                        (r.source === newRel.source && r.target === newRel.target) ||
+                        (r.source === newRel.source &&
+                            r.target === newRel.target &&
+                            r.sourceHandle === newRel.sourceHandle &&
+                            r.targetHandle === newRel.targetHandle) ||
                         (r.id === newRel.id)
                 );
                 if (!exists) {

@@ -20,6 +20,8 @@ export interface Relationship {
     id: string;
     source: string;
     target: string;
+    sourceHandle?: string;
+    targetHandle?: string;
     type: '1:1' | '1:N' | 'N:M';
 }
 

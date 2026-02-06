@@ -32,37 +32,37 @@ const EdgeEditModal: React.FC<EdgeEditModalProps> = ({
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-800">Edit Relationship</h2>
+                <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50/50">
+                    <h2 className="text-lg font-bold text-gray-800">관계 편집</h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-500 hover:text-gray-700 transition-colors"
+                        className="p-2 hover:bg-white rounded-full transition-colors text-gray-400 hover:text-gray-600 border border-transparent hover:border-gray-200"
                     >
-                        <X size={24} />
+                        <X size={20} />
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 space-y-4">
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                        <div className="text-sm text-gray-600 mb-2">Connection</div>
-                        <div className="font-semibold text-gray-800">
-                            {sourceEntityName} → {targetEntityName}
+                <div className="p-6 space-y-5">
+                    <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                        <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-2">연결 정보</div>
+                        <div className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                            <span>{sourceEntityName}</span>
+                            <span className="text-gray-400">→</span>
+                            <span>{targetEntityName}</span>
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                            Relationship Type
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                            관계 유형
                         </label>
                         <div className="space-y-2">
                             {(['1:1', '1:N', 'N:M'] as const).map((relType) => (
                                 <label
                                     key={relType}
                                     className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all ${type === relType
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     <input
@@ -76,10 +76,10 @@ const EdgeEditModal: React.FC<EdgeEditModalProps> = ({
                                     <span className="ml-3 font-medium text-gray-800">
                                         {relType}
                                     </span>
-                                    <span className="ml-auto text-sm text-gray-500">
-                                        {relType === '1:1' && 'One to One'}
-                                        {relType === '1:N' && 'One to Many'}
-                                        {relType === 'N:M' && 'Many to Many'}
+                                    <span className="ml-auto text-xs text-gray-400 font-medium">
+                                        {relType === '1:1' && '일대일 (1:1)'}
+                                        {relType === '1:N' && '일대다 (1:N)'}
+                                        {relType === 'N:M' && '다대다 (N:M)'}
                                     </span>
                                 </label>
                             ))}
@@ -88,25 +88,25 @@ const EdgeEditModal: React.FC<EdgeEditModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+                <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
                     <button
                         onClick={onDelete}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                        className="px-4 py-2 text-sm bg-white border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-all font-semibold active:scale-95"
                     >
-                        Delete Relationship
+                        관계 삭제
                     </button>
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                            className="px-4 py-2 text-sm bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-all font-semibold active:scale-95"
                         >
-                            Cancel
+                            취소
                         </button>
                         <button
                             onClick={handleSave}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                            className="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-md hover:shadow-lg active:scale-95"
                         >
-                            Save Changes
+                            저장
                         </button>
                     </div>
                 </div>

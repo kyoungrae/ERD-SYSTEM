@@ -15,6 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 import EntityNode from './EntityNode';
+import ERDEdge from './ERDEdge';
 import EdgeEditModal from './EdgeEditModal';
 import ImportModal from './ImportModal';
 import Sidebar from './Sidebar';
@@ -24,6 +25,10 @@ import { Plus, Download, Upload, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const nodeTypes: NodeTypes = {
     entity: EntityNode,
+};
+
+const edgeTypes = {
+    erd: ERDEdge,
 };
 
 const ERDCanvas: React.FC = () => {
@@ -61,29 +66,55 @@ const ERDCanvas: React.FC = () => {
             id: rel.id,
             source: rel.source,
             target: rel.target,
-            type: 'smoothstep',
+            sourceHandle: rel.sourceHandle,
+            targetHandle: rel.targetHandle,
+            type: 'erd',
             label: rel.type,
             animated: true,
             style: { stroke: '#3b82f6', strokeWidth: 2 },
-            labelStyle: { fill: '#1f2937', fontWeight: 600 },
-            labelBgStyle: { fill: '#ffffff', fillOpacity: 0.8 },
         }));
         setEdges(flowEdges);
     }, [relationships, setEdges]);
 
+    const isValidConnection = useCallback((connection: Connection) => {
+        if (connection.source === connection.target) return false;
+
+        // Prevent duplicate relationships between same entities
+        const exists = relationships.some(rel =>
+            (rel.source === connection.source && rel.target === connection.target) ||
+            (rel.source === connection.target && rel.target === connection.source)
+        );
+
+        return !exists;
+    }, [relationships]);
+
     const onConnect = useCallback(
         (params: Connection) => {
-            if (params.source && params.target) {
+            if (params.source && params.target && params.source !== params.target) {
                 const newRelationship = {
                     id: `rel_${Date.now()}`,
                     source: params.source,
                     target: params.target,
+                    sourceHandle: params.sourceHandle || undefined,
+                    targetHandle: params.targetHandle || undefined,
                     type: '1:N' as const,
                 };
                 addRelationship(newRelationship);
             }
         },
         [addRelationship]
+    );
+
+    const onReconnect = useCallback(
+        (oldEdge: Edge, newConnection: Connection) => {
+            updateRelationship(oldEdge.id, {
+                source: newConnection.source || oldEdge.source,
+                target: newConnection.target || oldEdge.target,
+                sourceHandle: newConnection.sourceHandle || undefined,
+                targetHandle: newConnection.targetHandle || undefined,
+            });
+        },
+        [updateRelationship]
     );
 
     const onEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
@@ -157,28 +188,28 @@ const ERDCanvas: React.FC = () => {
                 <div className={`absolute top-4 ${isSidebarOpen ? 'left-6' : 'left-8'} z-10 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-gray-100 p-1.5 flex gap-1.5 transition-all duration-300`}>
                     <button
                         onClick={handleAddEntity}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-md hover:shadow-lg active:scale-95"
+                        className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm font-bold shadow-md hover:shadow-lg active:scale-95"
                     >
-                        <Plus size={18} />
-                        Add Table
+                        <Plus size={16} />
+                        테이블 추가
                     </button>
 
                     <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
 
                     <button
                         onClick={handleExport}
-                        className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all font-semibold shadow-sm active:scale-95"
+                        className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm font-bold shadow-sm active:scale-95"
                     >
-                        <Upload size={18} className="text-green-500" />
-                        Export
+                        <Upload size={16} className="text-green-500" />
+                        내보내기
                     </button>
 
                     <button
                         onClick={() => setIsImportModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all font-semibold shadow-sm active:scale-95"
+                        className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm font-bold shadow-sm active:scale-95"
                     >
-                        <Download size={18} className="text-purple-500" />
-                        Import
+                        <Download size={16} className="text-purple-500" />
+                        가져오기
                     </button>
                 </div>
 
@@ -189,9 +220,12 @@ const ERDCanvas: React.FC = () => {
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
+                    onReconnect={onReconnect}
+                    isValidConnection={isValidConnection}
                     onEdgeDoubleClick={onEdgeDoubleClick}
                     onNodeDragStop={onNodeDragStop}
                     nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
                     connectionMode={ConnectionMode.Loose}
                     fitView
                 >

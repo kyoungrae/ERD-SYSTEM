@@ -24,7 +24,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
         const duplicateNames = checkDuplicates(data);
 
         if (duplicateNames.length > 0) {
-            const message = `The following tables already exist: ${duplicateNames.join(', ')}.\n\nDo you want to OVERWRITE them?\n(Click OK to overwrite, Cancel to skip duplicates and only import new tables)`;
+            const message = `다음 테이블이 이미 존재합니다: ${duplicateNames.join(', ')}.\n\n기존 테이블을 덮어쓰시겠습니까?\n(확인을 누르면 덮어쓰고, 취소를 누르면 중복을 제외한 새 테이블만 추가합니다)`;
             const overwrite = window.confirm(message);
             mergeData(data, overwrite);
         } else {
@@ -70,11 +70,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
-                {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-800">Import ERD Data</h2>
-                        <p className="text-sm text-gray-500 mt-1">Upload a JSON file or paste SQL DDL code</p>
+                        <h2 className="text-xl font-bold text-gray-800">데이터 가져오기</h2>
+                        <p className="text-sm text-gray-500 mt-1">JSON 파일 업로드 또는 SQL(DDL) 코드를 입력하세요</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -94,7 +93,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                             }`}
                     >
                         <Download size={18} />
-                        File Import
+                        파일 가져오기
                     </button>
                     <button
                         onClick={() => setTab('code')}
@@ -104,7 +103,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                             }`}
                     >
                         <Code size={18} />
-                        SQL (DDL) Script
+                        SQL 스크립트
                     </button>
                 </div>
 
@@ -115,8 +114,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                             <div className="p-4 bg-blue-50 text-blue-500 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
                                 <Download size={32} />
                             </div>
-                            <p className="text-gray-600 font-medium">Click to import or drag & drop</p>
-                            <p className="text-xs text-gray-400 mt-2">Supports .json files exported from this system</p>
+                            <p className="text-gray-600 font-medium">클릭하여 파일을 선택하거나 드래그 앤 드롭하세요</p>
+                            <p className="text-xs text-gray-400 mt-2">이 시스템에서 내보낸 .json 파일을 지원합니다</p>
                             <input
                                 type="file"
                                 accept=".json"
@@ -134,7 +133,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                                         setError(null);
                                     }}
                                     className="w-full h-64 p-4 bg-gray-900 text-blue-100 font-mono text-sm rounded-xl outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                    placeholder={`CREATE TABLE users (\n  id INT PRIMARY KEY,\n  username VARCHAR(255),\n  email VARCHAR(255) NOT NULL\n);`}
+                                    placeholder={`-- 예시 SQL DDL\nCREATE TABLE users (\n  id INT PRIMARY KEY,\n  username VARCHAR(255),\n  email VARCHAR(255) NOT NULL\n);`}
                                 />
                                 <div className="absolute top-3 right-3 opacity-30 group-hover:opacity-100 transition-opacity">
                                     <div className="px-2 py-1 bg-gray-700 text-[10px] text-gray-300 rounded uppercase tracking-widest font-bold">SQL</div>
@@ -151,21 +150,20 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 py-3 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                        className="flex-1 py-2 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors text-sm"
                     >
-                        Cancel
+                        취소
                     </button>
                     {tab === 'code' && (
                         <button
                             onClick={handleSqlImport}
-                            className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow hover:shadow-lg hover:shadow-blue-200 flex items-center justify-center gap-2"
+                            className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow hover:shadow-lg hover:shadow-blue-200 flex items-center justify-center gap-2 text-sm"
                         >
                             <Check size={18} />
-                            Generate Entities
+                            엔티티 생성
                         </button>
                     )}
                 </div>

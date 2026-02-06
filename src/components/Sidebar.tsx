@@ -16,9 +16,9 @@ const Sidebar: React.FC = () => {
             <div className="p-6 border-b border-gray-100 bg-gray-50/50">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 bg-blue-500 rounded-lg text-white">
-                        <Database size={20} />
+                        <Database size={18} />
                     </div>
-                    <h2 className="text-xl font-bold text-gray-800 tracking-tight">Tables</h2>
+                    <h2 className="text-lg font-bold text-gray-800 tracking-tight">엔티티 목록</h2>
                     <span className="ml-auto bg-gray-200 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
                         {entities.length}
                     </span>
@@ -32,7 +32,7 @@ const Sidebar: React.FC = () => {
                     />
                     <input
                         type="text"
-                        placeholder="Search entities..."
+                        placeholder="테이블 검색..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
@@ -47,7 +47,7 @@ const Sidebar: React.FC = () => {
                         <div className="p-3 bg-gray-50 rounded-full text-gray-300 mb-2">
                             <Search size={24} />
                         </div>
-                        <p className="text-sm text-gray-400">No tables found</p>
+                        <p className="text-sm text-gray-400">엔티티를 찾을 수 없습니다</p>
                     </div>
                 ) : (
                     <div className="space-y-1">
@@ -87,7 +87,7 @@ const Sidebar: React.FC = () => {
                 <span>ERD Visualizer v1.0</span>
                 <div className="flex gap-2">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                    Live Syncing
+                    실시간 동기화 중
                 </div>
             </div>
         </div>
