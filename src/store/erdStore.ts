@@ -10,6 +10,7 @@ interface ERDStore extends ERDState {
     deleteRelationship: (id: string) => void;
     exportData: () => ERDState;
     importData: (data: ERDState) => void;
+    mergeData: (data: ERDState, overwrite?: boolean) => void;
 }
 
 export const useERDStore = create<ERDStore>((set, get) => ({
@@ -65,5 +66,55 @@ export const useERDStore = create<ERDStore>((set, get) => ({
         set({
             entities: data.entities,
             relationships: data.relationships,
+        }),
+
+    mergeData: (data, overwrite = false) =>
+        set((state) => {
+            let newEntities = [...state.entities];
+            let newRelationships = [...state.relationships];
+
+            data.entities.forEach((newEntity) => {
+                const existingIndex = newEntities.findIndex(
+                    (e) => e.name.toLowerCase() === newEntity.name.toLowerCase()
+                );
+
+                if (existingIndex !== -1) {
+                    if (overwrite) {
+                        // Replace existing entity
+                        const oldId = newEntities[existingIndex].id;
+                        newEntities[existingIndex] = { ...newEntity };
+
+                        // Clean up relationships for the old ID if ID changed (though parser uses new IDs)
+                        // Actually, if we overwrite, we should probably keep the new ID but update relationships.
+                        // But wait, relationships in 'data' are already linked to 'newEntity.id'.
+                        newRelationships = newRelationships.filter(
+                            (r) => r.source !== oldId && r.target !== oldId
+                        );
+                    } else {
+                        // Skip if not overwriting
+                        return;
+                    }
+                } else {
+                    // Add as new
+                    newEntities.push(newEntity);
+                }
+            });
+
+            // Add new relationships, preventing duplicates
+            data.relationships.forEach((newRel) => {
+                const exists = newRelationships.some(
+                    (r) =>
+                        (r.source === newRel.source && r.target === newRel.target) ||
+                        (r.id === newRel.id)
+                );
+                if (!exists) {
+                    newRelationships.push(newRel);
+                }
+            });
+
+            return {
+                entities: newEntities,
+                relationships: newRelationships,
+            };
         }),
 }));

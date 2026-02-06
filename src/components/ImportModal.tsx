@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Upload, Code, Check } from 'lucide-react';
+import { X, Download, Code, Check } from 'lucide-react';
 import { useERDStore } from '../store/erdStore';
 import { parseSQLToERD } from '../utils/sqlParser';
 
@@ -8,10 +8,30 @@ interface ImportModalProps {
 }
 
 const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
-    const { importData } = useERDStore();
+    const { entities, mergeData } = useERDStore();
     const [tab, setTab] = useState<'file' | 'code'>('file');
     const [sqlCode, setSqlCode] = useState('');
     const [error, setError] = useState<string | null>(null);
+
+    const checkDuplicates = (newData: any) => {
+        const duplicates = newData.entities.filter((newEntity: any) =>
+            entities.some(e => e.name.toLowerCase() === newEntity.name.toLowerCase())
+        );
+        return duplicates.map((d: any) => d.name);
+    };
+
+    const processImport = (data: any) => {
+        const duplicateNames = checkDuplicates(data);
+
+        if (duplicateNames.length > 0) {
+            const message = `The following tables already exist: ${duplicateNames.join(', ')}.\n\nDo you want to OVERWRITE them?\n(Click OK to overwrite, Cancel to skip duplicates and only import new tables)`;
+            const overwrite = window.confirm(message);
+            mergeData(data, overwrite);
+        } else {
+            mergeData(data, false);
+        }
+        onClose();
+    };
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -20,8 +40,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target?.result as string);
-                    importData(data);
-                    onClose();
+                    processImport(data);
                 } catch (err) {
                     setError('Failed to parse JSON file. Please check the format.');
                 }
@@ -42,8 +61,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                 setError('No valid CREATE TABLE statements found.');
                 return;
             }
-            importData(data);
-            onClose();
+            processImport(data);
         } catch (err) {
             setError('Failed to parse SQL. Please check your syntax.');
         }
@@ -71,18 +89,18 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                     <button
                         onClick={() => setTab('file')}
                         className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium transition-all ${tab === 'file'
-                                ? 'bg-white shadow-sm text-blue-600'
-                                : 'text-gray-500 hover:bg-gray-200/50'
+                            ? 'bg-white shadow-sm text-blue-600'
+                            : 'text-gray-500 hover:bg-gray-200/50'
                             }`}
                     >
-                        <Upload size={18} />
-                        File Upload
+                        <Download size={18} />
+                        File Import
                     </button>
                     <button
                         onClick={() => setTab('code')}
                         className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium transition-all ${tab === 'code'
-                                ? 'bg-white shadow-sm text-blue-600'
-                                : 'text-gray-500 hover:bg-gray-200/50'
+                            ? 'bg-white shadow-sm text-blue-600'
+                            : 'text-gray-500 hover:bg-gray-200/50'
                             }`}
                     >
                         <Code size={18} />
@@ -93,17 +111,17 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                 {/* Content */}
                 <div className="p-8 flex-1">
                     {tab === 'file' ? (
-                        <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/30 group hover:border-blue-400 transition-colors">
+                        <div className="relative flex flex-col items-center justify-center py-10 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/30 group hover:border-blue-400 transition-colors">
                             <div className="p-4 bg-blue-50 text-blue-500 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
-                                <Upload size={32} />
+                                <Download size={32} />
                             </div>
-                            <p className="text-gray-600 font-medium">Click to upload or drag & drop</p>
+                            <p className="text-gray-600 font-medium">Click to import or drag & drop</p>
                             <p className="text-xs text-gray-400 mt-2">Supports .json files exported from this system</p>
                             <input
                                 type="file"
                                 accept=".json"
                                 onChange={handleFileUpload}
-                                className="absolute inset-x-0 bottom-0 top-32 cursor-pointer opacity-0"
+                                className="absolute inset-0 cursor-pointer opacity-0"
                             />
                         </div>
                     ) : (

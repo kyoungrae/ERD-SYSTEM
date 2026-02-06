@@ -17,9 +17,10 @@ import 'reactflow/dist/style.css';
 import EntityNode from './EntityNode';
 import EdgeEditModal from './EdgeEditModal';
 import ImportModal from './ImportModal';
+import Sidebar from './Sidebar';
 import { useERDStore } from '../store/erdStore';
 import { type Relationship } from '../types/erd';
-import { Plus, Download, Upload } from 'lucide-react';
+import { Plus, Download, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const nodeTypes: NodeTypes = {
     entity: EntityNode,
@@ -41,6 +42,7 @@ const ERDCanvas: React.FC = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [editingRelationship, setEditingRelationship] = useState<Relationship | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     // Convert entities to ReactFlow nodes
     useEffect(() => {
@@ -126,78 +128,105 @@ const ERDCanvas: React.FC = () => {
     }, [updateEntity]);
 
     return (
-        <div className="w-full h-screen bg-gray-50">
-            {/* Toolbar */}
-            <div className="absolute top-4 left-4 z-10 bg-white rounded-lg shadow-lg p-2 flex gap-2">
-                <button
-                    onClick={handleAddEntity}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-md hover:shadow-lg"
+        <div className="flex w-full h-screen overflow-hidden bg-gray-50">
+            {/* Left Sidebar wrapper with transition */}
+            <div className="relative flex h-full">
+                <div
+                    className={`h-full transition-all duration-300 ease-in-out border-r border-gray-200 overflow-hidden bg-white shadow-xl ${isSidebarOpen ? 'w-72 flex-shrink-0' : 'w-0 border-none'
+                        }`}
                 >
-                    <Plus size={18} />
-                    Add Table
-                </button>
+                    <div className="w-72 h-full">
+                        <Sidebar />
+                    </div>
+                </div>
 
+                {/* Attached Toggle Button */}
                 <button
-                    onClick={handleExport}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium shadow-md hover:shadow-lg"
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className={`absolute top-1/2 -translate-y-1/2 z-30 w-5 h-12 bg-white rounded-r-lg shadow-md border border-l-0 border-gray-200 text-gray-400 hover:text-blue-500 hover:w-6 transition-all active:scale-95 flex items-center justify-center ${isSidebarOpen ? '-right-5' : 'left-0'
+                        }`}
+                    title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
                 >
-                    <Download size={18} />
-                    Export
-                </button>
-
-                <button
-                    onClick={() => setIsImportModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium shadow-md hover:shadow-lg"
-                >
-                    <Upload size={18} />
-                    Import
+                    {isSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                 </button>
             </div>
 
-            {/* React Flow Canvas */}
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onEdgeDoubleClick={onEdgeDoubleClick}
-                onNodeDragStop={onNodeDragStop}
-                nodeTypes={nodeTypes}
-                connectionMode={ConnectionMode.Loose}
-                fitView
-            >
-                <Controls />
-                <MiniMap
-                    nodeColor={() => '#3b82f6'}
-                    className="!bg-white !border-2 !border-gray-200"
-                />
-                <Background
-                    variant={BackgroundVariant.Dots}
-                    gap={16}
-                    size={1}
-                    color="#d1d5db"
-                />
-            </ReactFlow>
+            {/* Main Canvas Area */}
+            <div className="flex-1 h-full relative">
+                {/* Toolbar */}
+                <div className={`absolute top-4 ${isSidebarOpen ? 'left-6' : 'left-8'} z-10 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-gray-100 p-1.5 flex gap-1.5 transition-all duration-300`}>
+                    <button
+                        onClick={handleAddEntity}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold shadow-md hover:shadow-lg active:scale-95"
+                    >
+                        <Plus size={18} />
+                        Add Table
+                    </button>
 
-            {/* Modals */}
-            {isImportModalOpen && (
-                <ImportModal onClose={() => setIsImportModalOpen(false)} />
-            )}
+                    <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
 
-            {editingRelationship && (
-                <EdgeEditModal
-                    relationship={editingRelationship}
-                    sourceEntityName={entities.find(e => e.id === editingRelationship.source)?.name || 'Unknown'}
-                    targetEntityName={entities.find(e => e.id === editingRelationship.target)?.name || 'Unknown'}
-                    onSave={(updated) => updateRelationship(updated.id, updated)}
-                    onDelete={() => {
-                        deleteRelationship(editingRelationship.id);
-                        setEditingRelationship(null);
-                    }}
-                    onClose={() => setEditingRelationship(null)}
-                />
-            )}
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all font-semibold shadow-sm active:scale-95"
+                    >
+                        <Upload size={18} className="text-green-500" />
+                        Export
+                    </button>
+
+                    <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all font-semibold shadow-sm active:scale-95"
+                    >
+                        <Download size={18} className="text-purple-500" />
+                        Import
+                    </button>
+                </div>
+
+                {/* React Flow Canvas */}
+                <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    onEdgeDoubleClick={onEdgeDoubleClick}
+                    onNodeDragStop={onNodeDragStop}
+                    nodeTypes={nodeTypes}
+                    connectionMode={ConnectionMode.Loose}
+                    fitView
+                >
+                    <Controls />
+                    <MiniMap
+                        nodeColor={() => '#3b82f6'}
+                        className="!bg-white !border-2 !border-gray-100 !rounded-xl !shadow-lg"
+                    />
+                    <Background
+                        variant={BackgroundVariant.Dots}
+                        gap={20}
+                        size={1}
+                        color="#e5e7eb"
+                    />
+                </ReactFlow>
+
+                {/* Modals */}
+                {isImportModalOpen && (
+                    <ImportModal onClose={() => setIsImportModalOpen(false)} />
+                )}
+
+                {editingRelationship && (
+                    <EdgeEditModal
+                        relationship={editingRelationship}
+                        sourceEntityName={entities.find(e => e.id === editingRelationship.source)?.name || 'Unknown'}
+                        targetEntityName={entities.find(e => e.id === editingRelationship.target)?.name || 'Unknown'}
+                        onSave={(updated) => updateRelationship(updated.id, updated)}
+                        onDelete={() => {
+                            deleteRelationship(editingRelationship.id);
+                            setEditingRelationship(null);
+                        }}
+                        onClose={() => setEditingRelationship(null)}
+                    />
+                )}
+            </div>
         </div>
     );
 };

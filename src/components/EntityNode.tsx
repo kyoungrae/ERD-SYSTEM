@@ -122,8 +122,8 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                             onClick={(e) => handleUpdateAttribute(e, attr.id, { isPK: !attr.isPK })}
                             onMouseDown={(e) => !isLocked && e.stopPropagation()}
                             disabled={isLocked}
-                            className={`${!isLocked ? 'nodrag' : 'pointer-events-none'} p-1 rounded transition-colors ${attr.isPK ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300'}`}
-                            title="Primary Key"
+                            className={`${!isLocked ? 'nodrag' : 'pointer-events-auto cursor-grab'} p-1 rounded transition-colors ${attr.isPK ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300'}`}
+                            title={attr.isPK ? "Primary Key (PK)" : "Set as Primary Key (PK)"}
                         >
                             <Key size={14} />
                         </button>
@@ -162,8 +162,8 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                             onClick={(e) => handleUpdateAttribute(e, attr.id, { isFK: !attr.isFK })}
                             onMouseDown={(e) => !isLocked && e.stopPropagation()}
                             disabled={isLocked}
-                            className={`${!isLocked ? 'nodrag' : 'pointer-events-none'} p-1 rounded transition-colors ${attr.isFK ? 'text-purple-500 bg-purple-50' : 'text-gray-300'}`}
-                            title="Foreign Key"
+                            className={`${!isLocked ? 'nodrag' : 'pointer-events-auto cursor-grab'} p-1 rounded transition-colors ${attr.isFK ? 'text-purple-500 bg-purple-50' : 'text-gray-300'}`}
+                            title={attr.isFK ? "Foreign Key (FK)" : "Set as Foreign Key (FK)"}
                         >
                             <Link size={14} />
                         </button>
