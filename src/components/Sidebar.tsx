@@ -1,14 +1,26 @@
 import React, { useState } from 'react';
 import { useERDStore } from '../store/erdStore';
-import { Database, Search, ChevronRight, Table as TableIcon, Hash } from 'lucide-react';
+import { Database, Search, ChevronRight, Table as TableIcon, Hash, Focus } from 'lucide-react';
+import { useReactFlow } from 'reactflow';
 
 const Sidebar: React.FC = () => {
     const { entities } = useERDStore();
+    const { fitView } = useReactFlow();
     const [search, setSearch] = useState('');
 
     const filteredEntities = entities.filter(e =>
         e.name.toLowerCase().includes(search.toLowerCase())
     );
+
+    const handleFocusNode = (e: React.MouseEvent, nodeId: string) => {
+        e.stopPropagation();
+        e.preventDefault();
+        fitView({
+            nodes: [{ id: nodeId }],
+            duration: 800,
+            padding: 0.5,
+        });
+    };
 
     return (
         <div className="w-72 h-full bg-white flex flex-col z-20 overflow-hidden">
@@ -54,10 +66,17 @@ const Sidebar: React.FC = () => {
                         {filteredEntities.map((entity) => (
                             <div key={entity.id} className="group/item">
                                 <details className="group">
-                                    <summary className="list-none flex items-center gap-2 p-2 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors">
+                                    <summary className="list-none flex items-center gap-2 p-2 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors group/summary">
                                         <ChevronRight size={14} className="text-gray-400 group-open:rotate-90 transition-transform" />
                                         <TableIcon size={16} className="text-blue-500" />
                                         <span className="text-sm font-semibold text-gray-700 truncate">{entity.name}</span>
+                                        <button
+                                            onClick={(e) => handleFocusNode(e, entity.id)}
+                                            className="ml-auto p-1.5 hover:bg-blue-100 rounded text-blue-500 transition-all active:scale-90"
+                                            title="테이블 위치로 이동"
+                                        >
+                                            <Focus size={14} />
+                                        </button>
                                     </summary>
 
                                     <div className="pl-8 pr-2 py-2 space-y-2 border-l border-gray-100 ml-4 mb-2 mt-1">

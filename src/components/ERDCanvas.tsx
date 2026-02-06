@@ -11,6 +11,7 @@ import ReactFlow, {
     type NodeTypes,
     ConnectionMode,
     BackgroundVariant,
+    ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -31,7 +32,7 @@ const edgeTypes = {
     erd: ERDEdge,
 };
 
-const ERDCanvas: React.FC = () => {
+const ERDCanvasContent: React.FC = () => {
     const {
         entities,
         relationships,
@@ -63,6 +64,15 @@ const ERDCanvas: React.FC = () => {
 
     // Convert relationships to ReactFlow edges
     useEffect(() => {
+        const getRelColor = (type: string) => {
+            switch (type) {
+                case '1:1': return '#10b981'; // Green
+                case '1:N': return '#3b82f6'; // Blue
+                case 'N:M': return '#8b5cf6'; // Purple
+                default: return '#3b82f6';
+            }
+        };
+
         const flowEdges: Edge[] = relationships.map((rel) => ({
             id: rel.id,
             source: rel.source,
@@ -75,7 +85,8 @@ const ERDCanvas: React.FC = () => {
             reconnectable: true,
             hidden: rel.id === reconnectingEdgeId, // Hide while being "moved"
             interactionWidth: 40,
-            style: { stroke: '#3b82f6', strokeWidth: 2 },
+            style: { stroke: getRelColor(rel.type), strokeWidth: 2 },
+            data: { color: getRelColor(rel.type) }
         }));
         setEdges(flowEdges);
     }, [relationships, setEdges, reconnectingEdgeId]);
@@ -279,8 +290,8 @@ const ERDCanvas: React.FC = () => {
                     <Background
                         variant={BackgroundVariant.Dots}
                         gap={20}
-                        size={1}
-                        color="#e5e7eb"
+                        size={1.5}
+                        color="#84878bff"
                     />
                 </ReactFlow>
 
@@ -304,6 +315,14 @@ const ERDCanvas: React.FC = () => {
                 )}
             </div>
         </div>
+    );
+};
+
+const ERDCanvas: React.FC = () => {
+    return (
+        <ReactFlowProvider>
+            <ERDCanvasContent />
+        </ReactFlowProvider>
     );
 };
 
