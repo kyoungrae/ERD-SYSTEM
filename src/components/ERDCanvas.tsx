@@ -12,6 +12,7 @@ import ReactFlow, {
     ConnectionMode,
     BackgroundVariant,
     ReactFlowProvider,
+    PanOnScrollMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -280,6 +281,10 @@ const ERDCanvasContent: React.FC = () => {
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
                     connectionMode={ConnectionMode.Loose}
+                    panOnScroll={true}
+                    panOnScrollMode={PanOnScrollMode.Free}
+                    zoomOnScroll={false}
+                    zoomActivationKeyCode="Control"
                     fitView
                 >
                     <Controls />
