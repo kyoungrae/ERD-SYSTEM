@@ -13,6 +13,7 @@ import ReactFlow, {
     BackgroundVariant,
     ReactFlowProvider,
     PanOnScrollMode,
+    useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -25,7 +26,8 @@ import { useERDStore } from '../store/erdStore';
 import { type Relationship } from '../types/erd';
 import { useAuthStore } from '../store/authStore';
 import { useProjectStore } from '../store/projectStore';
-import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as UserIcon, Home } from 'lucide-react';
+import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as UserIcon, Home, Layout, ArrowDown, ArrowRight, ChevronDown, Frame } from 'lucide-react';
+import { getLayoutedElements } from '../utils/layout';
 
 const nodeTypes: NodeTypes = {
     entity: EntityNode,
@@ -59,6 +61,9 @@ const ERDCanvasContent: React.FC = () => {
     const [editingRelationship, setEditingRelationship] = useState<Relationship | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
+    const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
+    const flowWrapper = React.useRef<HTMLDivElement>(null);
+    const { getViewport } = useReactFlow();
 
     // Initial load of project data into ERDStore
     useEffect(() => {
@@ -232,6 +237,118 @@ const ERDCanvasContent: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+
+
+    const onLayout = useCallback((direction: 'TB' | 'LR' = 'TB', scope: 'ALL' | 'VISIBLE' = 'ALL') => {
+        let nodesToLayout = nodes;
+        let edgesToLayout = edges;
+
+        // If filtering by visibility
+        if (scope === 'VISIBLE' && flowWrapper.current) {
+            const { x, y, zoom } = getViewport();
+            const { width, height } = flowWrapper.current.getBoundingClientRect();
+
+            // Calculate visible bounds (world coordinates)
+            const minX = -x / zoom;
+            const minY = -y / zoom;
+            const maxX = minX + width / zoom;
+            const maxY = minY + height / zoom;
+
+            nodesToLayout = nodes.filter(node => {
+                const nodeX = node.position.x;
+                const nodeY = node.position.y;
+                const nodeW = (node.width || 200);
+                const nodeH = (node.height || 100);
+
+                // Simple intersection check
+                return (
+                    nodeX < maxX &&
+                    nodeX + nodeW > minX &&
+                    nodeY < maxY &&
+                    nodeY + nodeH > minY
+                );
+            });
+
+            const nodeIds = new Set(nodesToLayout.map(n => n.id));
+            edgesToLayout = edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target));
+        }
+
+        if (nodesToLayout.length === 0) {
+            alert("화면에 정렬할 테이블이 없습니다.");
+            setIsLayoutMenuOpen(false);
+            return;
+        }
+
+        const { nodes: layoutedNodes } = getLayoutedElements(
+            nodesToLayout,
+            edgesToLayout,
+            direction
+        );
+
+        let finalNodes = layoutedNodes;
+
+        // If we only laid out a subset, we need to position them relative to where they were, 
+        // essentially centering the new group in the bounding box of the old group.
+        if (scope === 'VISIBLE') {
+            const getBounds = (nodeList: Node[]) => {
+                if (nodeList.length === 0) return { x: 0, y: 0, w: 0, h: 0, cx: 0, cy: 0 };
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                nodeList.forEach(n => {
+                    minX = Math.min(minX, n.position.x);
+                    minY = Math.min(minY, n.position.y);
+                    maxX = Math.max(maxX, n.position.x + (n.width || 0));
+                    maxY = Math.max(maxY, n.position.y + (n.height || 0));
+                });
+                return { x: minX, y: minY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+            };
+
+            const oldBounds = getBounds(nodesToLayout);
+            const newBounds = getBounds(layoutedNodes);
+
+            const dx = oldBounds.cx - newBounds.cx;
+            const dy = oldBounds.cy - newBounds.cy;
+
+            finalNodes = layoutedNodes.map(n => ({
+                ...n,
+                position: {
+                    x: n.position.x + dx,
+                    y: n.position.y + dy
+                }
+            }));
+        }
+
+        // Merge updated nodes back into the main list
+        const newAllNodes = nodes.map(node => {
+            const updated = finalNodes.find(n => n.id === node.id);
+            return updated ? updated : node;
+        });
+
+        const newAllEdges = edges.map(edge => {
+            const updated = (edgesToLayout as Edge[]).find(e => e.id === edge.id);
+            // Note: getLayoutedElements returns edges, but typically dagre doesn't change edges unless purely routing points (which dagre doesn't do for reactflow simple edges usually).
+            // But we should use the returned edges just in case.
+            return updated ? updated : edge;
+        });
+
+        setNodes(newAllNodes);
+        setEdges(newAllEdges);
+
+        // Sync with store
+        const updatedEntities = entities.map(entity => {
+            const layoutNode = finalNodes.find(n => n.id === entity.id);
+            if (layoutNode) {
+                return { ...entity, position: layoutNode.position };
+            }
+            return entity;
+        });
+
+        importData({
+            entities: updatedEntities,
+            relationships: relationships
+        });
+        setIsLayoutMenuOpen(false);
+    }, [nodes, edges, entities, relationships, setNodes, setEdges, importData, getViewport]);
+
     const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
         updateEntity(node.id, { position: node.position });
     }, [updateEntity]);
@@ -261,7 +378,7 @@ const ERDCanvasContent: React.FC = () => {
             </div>
 
             {/* Main Canvas Area */}
-            <div className="flex-1 h-full relative">
+            <div className="flex-1 h-full relative" ref={flowWrapper}>
                 {/* Toolbar */}
                 <div className={`absolute top-4 ${isSidebarOpen ? 'left-6' : 'left-8'} z-10 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-gray-100 p-1.5 flex gap-1.5 transition-all duration-300`}>
                     <button
@@ -283,6 +400,52 @@ const ERDCanvasContent: React.FC = () => {
                     </button>
 
                     <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsLayoutMenuOpen(!isLayoutMenuOpen)}
+                            className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm font-bold shadow-sm active:scale-95"
+                        >
+                            <Layout size={16} className="text-orange-500" />
+                            <span>정렬</span>
+                            <ChevronDown size={14} className={`text-gray-400 transition-transform ${isLayoutMenuOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isLayoutMenuOpen && (
+                            <div className="absolute top-full lg:left-0 right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 p-1.5 z-50 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-200">
+                                <button
+                                    onClick={() => onLayout('TB')}
+                                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors text-left"
+                                >
+                                    <ArrowRight size={16} className="text-green-500" />
+                                    <span>가로 정렬 (기본)</span>
+                                </button>
+                                <button
+                                    onClick={() => onLayout('LR')}
+                                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors text-left"
+                                >
+                                    <ArrowDown size={16} className="text-blue-500" />
+                                    <span>세로 정렬</span>
+                                </button>
+                                <div className="h-[1px] bg-gray-100 my-1" />
+                                <button
+                                    onClick={() => onLayout('TB', 'VISIBLE')}
+                                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors text-left"
+                                >
+                                    <Frame size={16} className="text-purple-500" />
+                                    <span>화면 내 가로 정렬</span>
+                                </button>
+                                <button
+                                    onClick={() => onLayout('LR', 'VISIBLE')}
+                                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors text-left"
+                                >
+                                    <Frame size={16} className="text-orange-500" />
+                                    <span>화면 내 세로 정렬</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
 
                     <button
                         onClick={handleExport}
