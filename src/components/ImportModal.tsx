@@ -1,0 +1,159 @@
+import React, { useState } from 'react';
+import { X, Upload, Code, Check } from 'lucide-react';
+import { useERDStore } from '../store/erdStore';
+import { parseSQLToERD } from '../utils/sqlParser';
+
+interface ImportModalProps {
+    onClose: () => void;
+}
+
+const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
+    const { importData } = useERDStore();
+    const [tab, setTab] = useState<'file' | 'code'>('file');
+    const [sqlCode, setSqlCode] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target?.result as string);
+                    importData(data);
+                    onClose();
+                } catch (err) {
+                    setError('Failed to parse JSON file. Please check the format.');
+                }
+            };
+            reader.readAsText(file);
+        }
+    };
+
+    const handleSqlImport = () => {
+        if (!sqlCode.trim()) {
+            setError('Please enter some SQL DDL code.');
+            return;
+        }
+
+        try {
+            const data = parseSQLToERD(sqlCode);
+            if (data.entities.length === 0) {
+                setError('No valid CREATE TABLE statements found.');
+                return;
+            }
+            importData(data);
+            onClose();
+        } catch (err) {
+            setError('Failed to parse SQL. Please check your syntax.');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-800">Import ERD Data</h2>
+                        <p className="text-sm text-gray-500 mt-1">Upload a JSON file or paste SQL DDL code</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-white rounded-full transition-colors text-gray-400 hover:text-gray-600 border border-transparent hover:border-gray-200"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex p-2 bg-gray-100/50 gap-1">
+                    <button
+                        onClick={() => setTab('file')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium transition-all ${tab === 'file'
+                                ? 'bg-white shadow-sm text-blue-600'
+                                : 'text-gray-500 hover:bg-gray-200/50'
+                            }`}
+                    >
+                        <Upload size={18} />
+                        File Upload
+                    </button>
+                    <button
+                        onClick={() => setTab('code')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium transition-all ${tab === 'code'
+                                ? 'bg-white shadow-sm text-blue-600'
+                                : 'text-gray-500 hover:bg-gray-200/50'
+                            }`}
+                    >
+                        <Code size={18} />
+                        SQL (DDL) Script
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-8 flex-1">
+                    {tab === 'file' ? (
+                        <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/30 group hover:border-blue-400 transition-colors">
+                            <div className="p-4 bg-blue-50 text-blue-500 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+                                <Upload size={32} />
+                            </div>
+                            <p className="text-gray-600 font-medium">Click to upload or drag & drop</p>
+                            <p className="text-xs text-gray-400 mt-2">Supports .json files exported from this system</p>
+                            <input
+                                type="file"
+                                accept=".json"
+                                onChange={handleFileUpload}
+                                className="absolute inset-x-0 bottom-0 top-32 cursor-pointer opacity-0"
+                            />
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="relative group">
+                                <textarea
+                                    value={sqlCode}
+                                    onChange={(e) => {
+                                        setSqlCode(e.target.value);
+                                        setError(null);
+                                    }}
+                                    className="w-full h-64 p-4 bg-gray-900 text-blue-100 font-mono text-sm rounded-xl outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                    placeholder={`CREATE TABLE users (\n  id INT PRIMARY KEY,\n  username VARCHAR(255),\n  email VARCHAR(255) NOT NULL\n);`}
+                                />
+                                <div className="absolute top-3 right-3 opacity-30 group-hover:opacity-100 transition-opacity">
+                                    <div className="px-2 py-1 bg-gray-700 text-[10px] text-gray-300 rounded uppercase tracking-widest font-bold">SQL</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="mt-4 p-3 bg-red-50 text-red-500 text-sm rounded-lg border border-red-100 flex items-center gap-2 animate-in slide-in-from-top-1">
+                            <div className="w-1 h-1 bg-red-500 rounded-full" />
+                            {error}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-3 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    {tab === 'code' && (
+                        <button
+                            onClick={handleSqlImport}
+                            className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-shadow hover:shadow-lg hover:shadow-blue-200 flex items-center justify-center gap-2"
+                        >
+                            <Check size={18} />
+                            Generate Entities
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default ImportModal;
