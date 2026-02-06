@@ -65,7 +65,7 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
 
     return (
         <div
-            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group relative overflow-hidden ${isLocked ? 'border-gray-200 shadow-sm' : 'border-blue-500 shadow-blue-100'}`}
+            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group relative ${isLocked ? 'border-gray-200 shadow-sm' : 'border-blue-500 shadow-blue-100'}`}
         >
             {/* Locking Mask Overlay */}
             {isLocked && (
