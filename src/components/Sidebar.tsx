@@ -102,11 +102,13 @@ const Sidebar: React.FC = () => {
             </div>
 
             {/* Sidebar Footer */}
-            <div className="mt-auto p-4 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400 flex items-center justify-between" >
-                <span>ERD Visualizer v1.0</span>
-                <div className="flex gap-2">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                    실시간 동기화 중
+            <div className="mt-auto p-4 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400 flex flex-col gap-1" >
+                <div className="flex items-center justify-between">
+                    <span>© 2026 이경태</span>
+                    <div className="flex gap-2">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                        실시간 동기화 중
+                    </div>
                 </div>
             </div>
         </div>

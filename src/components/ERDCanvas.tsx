@@ -23,7 +23,9 @@ import ImportModal from './ImportModal';
 import Sidebar from './Sidebar';
 import { useERDStore } from '../store/erdStore';
 import { type Relationship } from '../types/erd';
-import { Plus, Download, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
+import { useProjectStore } from '../store/projectStore';
+import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as UserIcon, Home } from 'lucide-react';
 
 const nodeTypes: NodeTypes = {
     entity: EntityNode,
@@ -42,8 +44,14 @@ const ERDCanvasContent: React.FC = () => {
         addRelationship,
         updateRelationship,
         deleteRelationship,
-        exportData
+        exportData,
+        importData
     } = useERDStore();
+
+    const { user, logout } = useAuthStore();
+    const { projects, currentProjectId, setCurrentProject, updateProjectData } = useProjectStore();
+
+    const currentProject = projects.find(p => p.id === currentProjectId);
 
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -51,6 +59,26 @@ const ERDCanvasContent: React.FC = () => {
     const [editingRelationship, setEditingRelationship] = useState<Relationship | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
+
+    // Initial load of project data into ERDStore
+    useEffect(() => {
+        if (currentProject) {
+            importData(currentProject.data);
+        }
+    }, [currentProjectId]); // Run when project changes
+
+    // Auto-save ERDStore changes to ProjectStore
+    useEffect(() => {
+        if (currentProjectId) {
+            const timer = setTimeout(() => {
+                updateProjectData(currentProjectId, {
+                    entities,
+                    relationships,
+                });
+            }, 1000); // Debounce saves
+            return () => clearTimeout(timer);
+        }
+    }, [entities, relationships, currentProjectId, updateProjectData]);
 
     // Convert entities to ReactFlow nodes
     useEffect(() => {
@@ -237,6 +265,16 @@ const ERDCanvasContent: React.FC = () => {
                 {/* Toolbar */}
                 <div className={`absolute top-4 ${isSidebarOpen ? 'left-6' : 'left-8'} z-10 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-gray-100 p-1.5 flex gap-1.5 transition-all duration-300`}>
                     <button
+                        onClick={() => setCurrentProject(null)}
+                        className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm font-bold shadow-sm active:scale-95"
+                        title="프로젝트 목록으로 돌아가기"
+                    >
+                        <Home size={16} className="text-blue-500" />
+                    </button>
+
+                    <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
+
+                    <button
                         onClick={handleAddEntity}
                         className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm font-bold shadow-md hover:shadow-lg active:scale-95"
                     >
@@ -261,6 +299,34 @@ const ERDCanvasContent: React.FC = () => {
                         <Download size={16} className="text-purple-500" />
                         가져오기
                     </button>
+
+                    <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
+
+                    {/* User Profile & Logout */}
+                    <div className="flex items-center gap-2 px-1">
+                        <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 bg-gray-50 rounded-lg border border-gray-100">
+                            {user?.picture ? (
+                                <img src={user.picture} alt={user.name} className="w-6 h-6 rounded-full border border-white shadow-sm" />
+                            ) : (
+                                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <UserIcon size={14} />
+                                </div>
+                            )}
+                            <span className="text-sm font-bold text-gray-700">{user?.name}</span>
+                        </div>
+                        <button
+                            onClick={() => {
+                                if (window.confirm('로그아웃 하시겠습니까?')) {
+                                    setCurrentProject(null);
+                                    logout();
+                                }
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all active:scale-95"
+                            title="로그아웃"
+                        >
+                            <LogOut size={18} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* React Flow Canvas */}
@@ -284,7 +350,10 @@ const ERDCanvasContent: React.FC = () => {
                     panOnScroll={true}
                     panOnScrollMode={PanOnScrollMode.Free}
                     zoomOnScroll={false}
+                    zoomOnDoubleClick={false}
                     zoomActivationKeyCode="Control"
+                    minZoom={0.05}
+                    maxZoom={4}
                     fitView
                 >
                     <Controls />

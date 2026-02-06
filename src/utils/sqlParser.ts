@@ -87,19 +87,54 @@ export const parseSQLToERD = (sql: string): { entities: Entity[], relationships:
                 }
 
                 const isPK = upperSection.includes('PRIMARY KEY');
+                let isFK = upperSection.includes('REFERENCES');
                 const isNullable = !upperSection.includes('NOT NULL');
+
+                // Extract DEFAULT value
+                let defaultVal: string | undefined;
+                const defaultMatch = section.match(/DEFAULT\s+([^, ]+)/i);
+                if (defaultMatch) {
+                    defaultVal = defaultMatch[1].replace(/['"`]/g, '');
+                }
+
+                // Extract COMMENT
+                let comment: string | undefined;
+                const commentMatch = section.match(/COMMENT\s+['"]([^'"]+)['"]/i);
+                if (commentMatch) {
+                    comment = commentMatch[1];
+                }
+
+                // Column-level Foreign Key check
+                if (isFK) {
+                    const inlineFKMatch = section.match(/REFERENCES\s+([^\s(]+)\s*\(([^)]+)\)/i);
+                    if (inlineFKMatch) {
+                        const refTable = inlineFKMatch[1].trim().replace(/[`"\[\]]/g, '');
+                        const refCol = inlineFKMatch[2].trim().replace(/[`"\[\]]/g, '');
+                        tableLevelFKs.push({ col: colName, refTable, refCol });
+                    }
+                }
 
                 attributes.push({
                     id: `attr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     name: colName,
                     type: colType,
                     isPK,
-                    isFK: false, // Will be updated if table-level FK found
-                    isNullable
+                    isFK,
+                    isNullable,
+                    defaultVal,
+                    comment
                 });
             });
 
             const newEntityId = `entity_${Date.now()}_${entities.length}`;
+
+            // Try to extract Table COMMENT if it exists after the closing parenthesis
+            let tableComment: string | undefined;
+            const tableCommentMatch = statement.match(/\)\s*(?:[^;]*\s+)?COMMENT\s*=\s*['"]([^'"]+)['"]/i);
+            if (tableCommentMatch) {
+                tableComment = tableCommentMatch[1];
+            }
+
             entities.push({
                 id: newEntityId,
                 name: tableName,
@@ -108,7 +143,8 @@ export const parseSQLToERD = (sql: string): { entities: Entity[], relationships:
                     y: 100 + Math.floor(entities.length / 3) * 400
                 },
                 attributes,
-                isLocked: true
+                isLocked: true,
+                comment: tableComment
             });
 
             // If we found table-level FKs, we'll process them outside to ensure all entities exist
@@ -139,35 +175,81 @@ export const parseSQLToERD = (sql: string): { entities: Entity[], relationships:
         }
     });
 
-    // Post-process table-level FKs to create relationships
+    // Final relationship resolution with proper IDs and handles
+    const finalRelationships: Relationship[] = [];
+    const relTracker = new Set<string>();
+
+    // 1. Process explicit FKs
     entities.forEach(entity => {
         const pending = (entity as any)._pendingFKs;
         if (pending) {
             pending.forEach((fk: any) => {
                 const targetEntity = entities.find(e => e.name === fk.refTable);
-                // We create the relationship even if targetEntity isn't found in current import?
-                // For now, let's only create if it exists.
                 if (targetEntity) {
-                    relationships.push({
-                        id: `rel_${Date.now()}_${relationships.length}`,
-                        source: entity.id,
-                        target: targetEntity.id,
-                        type: '1:N'
-                    });
+                    const relKey = `${entity.id}-${targetEntity.id}`;
+                    if (!relTracker.has(relKey)) {
+                        finalRelationships.push({
+                            id: `rel_${Date.now()}_${finalRelationships.length}`,
+                            source: entity.id,
+                            target: targetEntity.id,
+                            sourceHandle: 'right', // Default to right-to-left
+                            targetHandle: 'left',
+                            type: '1:N'
+                        });
+                        relTracker.add(relKey);
+                    }
                 }
             });
             delete (entity as any)._pendingFKs;
         }
     });
 
-    // Fix relationships that used names instead of IDs
+    // 2. Process ALTER TABLE relationships
     relationships.forEach(rel => {
         const sourceEntity = entities.find(e => e.id === rel.source || e.name === rel.source);
         const targetEntity = entities.find(e => e.id === rel.target || e.name === rel.target);
-        if (sourceEntity) rel.source = sourceEntity.id;
-        if (targetEntity) rel.target = targetEntity.id;
+
+        if (sourceEntity && targetEntity) {
+            const relKey = `${sourceEntity.id}-${targetEntity.id}`;
+            if (!relTracker.has(relKey)) {
+                finalRelationships.push({
+                    ...rel,
+                    source: sourceEntity.id,
+                    target: targetEntity.id,
+                    sourceHandle: 'right',
+                    targetHandle: 'left'
+                });
+                relTracker.add(relKey);
+            }
+        }
     });
 
-    return { entities, relationships };
+    // 3. Smart Detection: Guess relationships based on naming patterns (e.g. user_id)
+    entities.forEach(source => {
+        source.attributes.forEach(attr => {
+            if (attr.name.endsWith('_id') || attr.name.endsWith('_ID')) {
+                const targetName = attr.name.substring(0, attr.name.length - 3);
+                const target = entities.find(e => e.name.toLowerCase() === targetName.toLowerCase());
+
+                if (target && source.id !== target.id) {
+                    const relKey = `${source.id}-${target.id}`;
+                    if (!relTracker.has(relKey)) {
+                        attr.isFK = true; // Mark as FK if we found a match
+                        finalRelationships.push({
+                            id: `rel_smart_${Date.now()}_${finalRelationships.length}`,
+                            source: source.id,
+                            target: target.id,
+                            sourceHandle: 'right',
+                            targetHandle: 'left',
+                            type: '1:N'
+                        });
+                        relTracker.add(relKey);
+                    }
+                }
+            }
+        });
+    });
+
+    return { entities, relationships: finalRelationships };
 };
 
