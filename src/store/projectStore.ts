@@ -1,14 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project, DBType } from '../types/erd';
+import type { Project, DBType, ProjectMember } from '../types/erd';
 
 interface ProjectStore {
     projects: Project[];
     currentProjectId: string | null;
-    addProject: (name: string, dbType: DBType, description?: string) => Project;
+    addProject: (name: string, dbType: DBType, members: ProjectMember[], description?: string) => Project;
     deleteProject: (id: string) => void;
     setCurrentProject: (id: string | null) => void;
     updateProjectData: (id: string, data: any) => void;
+    updateProjectMembers: (id: string, members: ProjectMember[]) => void;
 }
 
 export const useProjectStore = create<ProjectStore>()(
@@ -17,12 +18,13 @@ export const useProjectStore = create<ProjectStore>()(
             projects: [],
             currentProjectId: null,
 
-            addProject: (name, dbType, description) => {
+            addProject: (name, dbType, members, description) => {
                 const newProject: Project = {
                     id: `proj_${Date.now()}`,
                     name,
                     dbType,
                     description,
+                    members,
                     updatedAt: new Date().toISOString(),
                     data: { entities: [], relationships: [] },
                 };
@@ -44,6 +46,13 @@ export const useProjectStore = create<ProjectStore>()(
                 set((state) => ({
                     projects: state.projects.map((p) =>
                         p.id === id ? { ...p, data, updatedAt: new Date().toISOString() } : p
+                    ),
+                })),
+
+            updateProjectMembers: (id, members) =>
+                set((state) => ({
+                    projects: state.projects.map((p) =>
+                        p.id === id ? { ...p, members, updatedAt: new Date().toISOString() } : p
                     ),
                 })),
         }),

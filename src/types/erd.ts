@@ -30,12 +30,21 @@ export interface Relationship {
 
 export type DBType = 'MySQL' | 'PostgreSQL' | 'Oracle' | 'MSSQL';
 
+export interface ProjectMember {
+    id: string;
+    name: string;
+    email: string;
+    picture?: string;
+    role: 'OWNER' | 'MEMBER';
+}
+
 export interface Project {
     id: string;
     name: string;
     dbType: DBType;
     description?: string;
     updatedAt: string;
+    members: ProjectMember[];
     data: ERDState;
 }
 
