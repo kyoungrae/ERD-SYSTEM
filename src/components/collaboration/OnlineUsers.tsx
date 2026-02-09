@@ -1,3 +1,4 @@
+import { User as UserIcon } from 'lucide-react';
 import { useSyncStore, type OnlineUser } from '../../store/syncStore';
 
 export function OnlineUsers() {
@@ -47,9 +48,6 @@ export function OnlineUsers() {
 }
 
 function UserAvatar({ user, index }: { user: OnlineUser; index: number }) {
-    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-    const color = colors[index % colors.length];
-
     return (
         <div
             className="relative group"
@@ -64,11 +62,10 @@ function UserAvatar({ user, index }: { user: OnlineUser; index: number }) {
                 />
             ) : (
                 <div
-                    className="w-8 h-8 rounded-full border-2 border-zinc-800 flex items-center justify-center text-white text-xs font-medium"
-                    style={{ backgroundColor: color }}
+                    className="w-8 h-8 rounded-full border-2 border-zinc-800 flex items-center justify-center text-zinc-400 bg-zinc-800"
                     title={user.name}
                 >
-                    {user.name.charAt(0).toUpperCase()}
+                    <UserIcon size={14} />
                 </div>
             )}
 

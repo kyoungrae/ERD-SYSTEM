@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn, Database, ShieldCheck, Zap, Share2, UserPlus, Mail, Lock, User } from 'lucide-react';
+import { LogIn, Database, ShieldCheck, Zap, Share2, UserPlus, Mail, Lock, User, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useProjectStore } from '../store/projectStore';
 
@@ -7,13 +7,48 @@ const LoginPage: React.FC = () => {
     const { login } = useAuthStore();
     const { setCurrentProject } = useProjectStore();
     const [isSignup, setIsSignup] = useState(false);
+    const [isCodeSent, setIsCodeSent] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+    const [verificationCode, setVerificationCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const API_URL = 'http://localhost:3001/api/auth';
+
+    const handleRequestCode = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email || !password || !name) {
+            setError('모든 정보를 입력해주세요.');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`${API_URL}/request-verification`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || '인증 코드 발송에 실패했습니다.');
+            }
+
+            setIsCodeSent(true);
+            setSuccessMessage('인증 코드가 이메일로 발송되었습니다.');
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,7 +57,9 @@ const LoginPage: React.FC = () => {
 
         try {
             const endpoint = isSignup ? '/signup' : '/login';
-            const body = isSignup ? { email, password, name } : { email, password };
+            const body = isSignup
+                ? { email, password, name, code: verificationCode }
+                : { email, password };
 
             const response = await fetch(`${API_URL}${endpoint}`, {
                 method: 'POST',
@@ -36,9 +73,7 @@ const LoginPage: React.FC = () => {
                 throw new Error(data.message || '인증에 실패했습니다.');
             }
 
-            // In a real app, you'd store the token
             localStorage.setItem('auth-token', data.token);
-
             setCurrentProject(null);
             login(data.user, data.token);
         } catch (err: any) {
@@ -118,62 +153,100 @@ const LoginPage: React.FC = () => {
                     <div className="max-w-[360px] mx-auto w-full">
                         <div className="mb-10 text-center md:text-left">
                             <h2 className="text-3xl font-bold text-gray-900 mb-3">
-                                {isSignup ? '회원가입' : '환영합니다!'}
+                                {isSignup ? (isCodeSent ? '인증 코드 입력' : '회원가입') : '환영합니다!'}
                             </h2>
                             <p className="text-gray-500">
-                                {isSignup ? '새 계정을 생성하고 시작해보세요.' : '서비스 이용을 위해 로그인을 진행해주세요.'}
+                                {isSignup
+                                    ? (isCodeSent ? `${email}로 발송된 코드를 입력하세요.` : '새 계정을 생성하고 시작해보세요.')
+                                    : '서비스 이용을 위해 로그인을 진행해주세요.'}
                             </p>
                         </div>
 
-                        <form onSubmit={handleAuth} className="space-y-4">
-                            {isSignup && (
-                                <div className="space-y-1.5">
+                        <form onSubmit={isSignup && !isCodeSent ? handleRequestCode : handleAuth} className="space-y-4">
+                            {!isCodeSent && (
+                                <>
+                                    {isSignup && (
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-1">
+                                                <User size={14} className="text-blue-500" />
+                                                이름
+                                            </label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={name}
+                                                onChange={(e) => setName(e.target.value)}
+                                                placeholder="홍길동"
+                                                className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="space-y-1.5">
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-1">
+                                            <Mail size={14} className="text-blue-500" />
+                                            이메일
+                                        </label>
+                                        <input
+                                            type="email"
+                                            required
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="example@email.com"
+                                            className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-1">
+                                            <Lock size={14} className="text-blue-500" />
+                                            비밀번호
+                                        </label>
+                                        <input
+                                            type="password"
+                                            required
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                            className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {isCodeSent && (
+                                <div className="space-y-1.5 animate-in slide-in-from-right-4 duration-300">
                                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-1">
-                                        <User size={14} className="text-blue-500" />
-                                        이름
+                                        <ShieldCheck size={14} className="text-blue-500" />
+                                        인증 코드
                                     </label>
                                     <input
                                         type="text"
                                         required
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        placeholder="홍길동"
-                                        className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
+                                        maxLength={6}
+                                        value={verificationCode}
+                                        onChange={(e) => setVerificationCode(e.target.value)}
+                                        placeholder="000000"
+                                        className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300 text-center font-bold tracking-[8px] text-lg"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCodeSent(false)}
+                                        className="text-[11px] text-gray-400 hover:text-blue-500 ml-1 transition-colors underline"
+                                    >
+                                        이메일 수정하기
+                                    </button>
                                 </div>
                             )}
-                            <div className="space-y-1.5">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-1">
-                                    <Mail size={14} className="text-blue-500" />
-                                    이메일
-                                </label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="example@email.com"
-                                    className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-1">
-                                    <Lock size={14} className="text-blue-500" />
-                                    비밀번호
-                                </label>
-                                <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
-                                />
-                            </div>
 
                             {error && (
                                 <div className="p-3 bg-red-50 text-red-500 text-xs rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-1">
                                     {error}
+                                </div>
+                            )}
+
+                            {successMessage && !error && (
+                                <div className="p-3 bg-green-50 text-green-600 text-xs rounded-xl border border-green-100 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                                    <CheckCircle2 size={14} />
+                                    {successMessage}
                                 </div>
                             )}
 
@@ -185,9 +258,13 @@ const LoginPage: React.FC = () => {
                                 {loading ? (
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 ) : (
-                                    isSignup ? <UserPlus size={20} /> : <LogIn size={20} />
+                                    isSignup
+                                        ? (isCodeSent ? <UserPlus size={20} /> : <ChevronRight size={20} />)
+                                        : <LogIn size={20} />
                                 )}
-                                {isSignup ? '회원가입 완료' : '로그인'}
+                                {isSignup
+                                    ? (isCodeSent ? '회원가입 완료' : '인증 코드 받기')
+                                    : '로그인'}
                             </button>
                         </form>
 
@@ -216,7 +293,9 @@ const LoginPage: React.FC = () => {
                             <button
                                 onClick={() => {
                                     setIsSignup(!isSignup);
+                                    setIsCodeSent(false);
                                     setError(null);
+                                    setSuccessMessage(null);
                                 }}
                                 className="text-blue-600 font-bold hover:underline"
                             >

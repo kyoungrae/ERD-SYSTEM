@@ -12,9 +12,12 @@ function App() {
   const { connect, disconnect, authenticate, joinProject, leaveProject } = useSyncStore();
 
   useEffect(() => {
-    connect();
-    return () => disconnect();
-  }, [connect, disconnect]);
+    if (isAuthenticated) {
+      connect();
+    } else {
+      disconnect();
+    }
+  }, [isAuthenticated, connect, disconnect]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
