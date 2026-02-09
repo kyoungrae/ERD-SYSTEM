@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { type DBType, type ProjectMember } from '../types/erd';
 
 const ProjectListPage: React.FC = () => {
-    const { projects, addProject, addRemoteProject, deleteProject, setCurrentProject, updateProjectMembers } = useProjectStore();
+    const { projects, fetchProjects, addProject, addRemoteProject, deleteProject, setCurrentProject, updateProjectMembers } = useProjectStore();
     const { user, logout } = useAuthStore();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingMembersProject, setEditingMembersProject] = useState<string | null>(null);
@@ -15,6 +15,12 @@ const ProjectListPage: React.FC = () => {
     const [newProjectMembers, setNewProjectMembers] = useState<ProjectMember[]>([]);
     const [tempMembers, setTempMembers] = useState<ProjectMember[]>([]);
     const [memberInput, setMemberInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [createError, setCreateError] = useState<string | null>(null);
+
+    React.useEffect(() => {
+        fetchProjects();
+    }, [fetchProjects]);
 
     const targetProject = projects.find(p => p.id === editingMembersProject);
 
@@ -65,30 +71,31 @@ const ProjectListPage: React.FC = () => {
         }
     };
 
-    const handleCreateProject = (e: React.FormEvent) => {
+    const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim()) return;
 
-        const owner: ProjectMember = {
-            id: user?.id || 'owner',
-            name: user?.name || 'Owner',
-            email: user?.email || '',
-            picture: user?.picture,
-            role: 'OWNER'
-        };
+        setIsLoading(true);
+        setCreateError(null);
 
-        const project = addProject(
-            newProjectName,
-            newProjectDbType,
-            [owner, ...newProjectMembers],
-            newProjectDesc
-        );
+        try {
+            const project = await addProject(
+                newProjectName,
+                newProjectDbType,
+                [],
+                newProjectDesc
+            );
 
-        setNewProjectName('');
-        setNewProjectDesc('');
-        setNewProjectMembers([]);
-        setIsCreateModalOpen(false);
-        setCurrentProject(project.id);
+            setNewProjectName('');
+            setNewProjectDesc('');
+            setNewProjectMembers([]);
+            setIsCreateModalOpen(false);
+            setCurrentProject(project.id);
+        } catch (err: any) {
+            setCreateError(err.message || '프로젝트 생성에 실패했습니다.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -253,12 +260,14 @@ const ProjectListPage: React.FC = () => {
                                             <div
                                                 key={member.id}
                                                 className="w-7 h-7 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm"
-                                                title={`${member.name} (${member.role})`}
+                                                title={`${member.name || 'Unknown'} (${member.role})`}
                                             >
                                                 {member.picture ? (
-                                                    <img src={member.picture} alt={member.name} className="w-full h-full object-cover" />
+                                                    <img src={member.picture} alt={member.name || 'User'} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <span className="text-[10px] font-bold text-gray-400">{member.name.charAt(0)}</span>
+                                                    <span className="text-[10px] font-bold text-gray-400">
+                                                        {(member.name || '?').charAt(0)}
+                                                    </span>
                                                 )}
                                             </div>
                                         ))}
@@ -367,23 +376,36 @@ const ProjectListPage: React.FC = () => {
                                 )}
                             </div>
 
+                            {createError && (
+                                <div className="p-3 bg-red-50 text-red-500 text-xs rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-1">
+                                    {createError}
+                                </div>
+                            )}
+
                             <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
+                                    disabled={isLoading}
                                     onClick={() => {
                                         setIsCreateModalOpen(false);
                                         setNewProjectMembers([]);
                                         setMemberInput('');
+                                        setCreateError(null);
                                     }}
-                                    className="flex-1 py-4 px-6 bg-gray-50 text-gray-600 rounded-2xl font-bold hover:bg-gray-100 transition-all active:scale-95"
+                                    className="flex-1 py-4 px-6 bg-gray-50 text-gray-600 rounded-2xl font-bold hover:bg-gray-100 transition-all active:scale-95 disabled:opacity-50"
                                 >
                                     취소
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-[2] py-4 px-6 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95"
+                                    disabled={isLoading}
+                                    className="flex-[2] py-4 px-6 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    생성하기
+                                    {isLoading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        '생성하기'
+                                    )}
                                 </button>
                             </div>
                         </form>
@@ -418,14 +440,14 @@ const ProjectListPage: React.FC = () => {
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
                                                     {member.picture ? (
-                                                        <img src={member.picture} alt={member.name} className="w-full h-full rounded-full object-cover" />
+                                                        <img src={member.picture} alt={member.name || 'User'} className="w-full h-full rounded-full object-cover" />
                                                     ) : (
-                                                        member.name.charAt(0)
+                                                        (member.name || '?').charAt(0)
                                                     )}
                                                 </div>
                                                 <div>
                                                     <div className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                                                        {member.name}
+                                                        {member.name || 'Unknown User'}
                                                         {member.role === 'OWNER' && (
                                                             <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded font-black tracking-tight">OWNER</span>
                                                         )}
