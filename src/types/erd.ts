@@ -7,6 +7,7 @@ export interface Attribute {
     isNullable?: boolean;
     defaultVal?: string;
     comment?: string;
+    length?: string;
 }
 
 export interface Entity {
@@ -27,15 +28,33 @@ export interface Relationship {
     type: '1:1' | '1:N' | 'N:M';
 }
 
+export type DBType = 'MySQL' | 'PostgreSQL' | 'Oracle' | 'MSSQL';
+
 export interface Project {
     id: string;
     name: string;
+    dbType: DBType;
     description?: string;
     updatedAt: string;
     data: ERDState;
 }
 
+export type ChangeType = 'CREATE' | 'UPDATE' | 'DELETE' | 'PROJECT_SET';
+
+export interface HistoryLog {
+    id: string;
+    userId: string;
+    userName: string;
+    userPicture?: string;
+    timestamp: string;
+    type: ChangeType;
+    targetType: 'ENTITY' | 'RELATIONSHIP' | 'PROJECT';
+    targetName: string;
+    details: string; // e.g., "Name: USER -> USERS", "Added column: id"
+}
+
 export interface ERDState {
     entities: Entity[];
     relationships: Relationship[];
+    history?: HistoryLog[];
 }

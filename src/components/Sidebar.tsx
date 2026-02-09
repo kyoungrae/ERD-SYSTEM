@@ -5,7 +5,7 @@ import { useReactFlow } from 'reactflow';
 
 const Sidebar: React.FC = () => {
     const { entities } = useERDStore();
-    const { fitView } = useReactFlow();
+    const { fitView, setNodes } = useReactFlow();
     const [search, setSearch] = useState('');
 
     const filteredEntities = entities.filter(e =>
@@ -15,11 +15,21 @@ const Sidebar: React.FC = () => {
     const handleFocusNode = (e: React.MouseEvent, nodeId: string) => {
         e.stopPropagation();
         e.preventDefault();
+
+        // 1. Move camera to the node
         fitView({
             nodes: [{ id: nodeId }],
             duration: 800,
             padding: 0.5,
         });
+
+        // 2. Set node as selected to apply visual effects (orange border, glow)
+        setNodes((nodes) =>
+            nodes.map((node) => ({
+                ...node,
+                selected: node.id === nodeId
+            }))
+        );
     };
 
     return (

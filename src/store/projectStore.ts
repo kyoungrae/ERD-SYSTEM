@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project } from '../types/erd';
+import type { Project, DBType } from '../types/erd';
 
 interface ProjectStore {
     projects: Project[];
     currentProjectId: string | null;
-    addProject: (name: string, description?: string) => Project;
+    addProject: (name: string, dbType: DBType, description?: string) => Project;
     deleteProject: (id: string) => void;
     setCurrentProject: (id: string | null) => void;
     updateProjectData: (id: string, data: any) => void;
@@ -17,10 +17,11 @@ export const useProjectStore = create<ProjectStore>()(
             projects: [],
             currentProjectId: null,
 
-            addProject: (name, description) => {
+            addProject: (name, dbType, description) => {
                 const newProject: Project = {
                     id: `proj_${Date.now()}`,
                     name,
+                    dbType,
                     description,
                     updatedAt: new Date().toISOString(),
                     data: { entities: [], relationships: [] },

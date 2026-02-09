@@ -79,11 +79,13 @@ export const parseSQLToERD = (sql: string): { entities: Entity[], relationships:
                 const parts = section.split(/\s+/);
                 const colName = parts[0].replace(/[`"\[\]]/g, '');
 
-                // Extract type - handle cases like VARCHAR(50)
-                let colType = 'VARCHAR(255)';
-                const typeMatch = section.match(/[^\s]+\s+([^\s,]+(?:\([^)]+\))?)/i);
+                // Extract type and length - handle cases like VARCHAR(50)
+                let colType = 'VARCHAR';
+                let colLength: string | undefined;
+                const typeMatch = section.match(/[^\s]+\s+([^\s,()]+)(?:\(([^)]+)\))?/i);
                 if (typeMatch) {
                     colType = typeMatch[1].toUpperCase();
+                    colLength = typeMatch[2]; // This will be "50" from VARCHAR(50)
                 }
 
                 const isPK = upperSection.includes('PRIMARY KEY');
@@ -118,6 +120,7 @@ export const parseSQLToERD = (sql: string): { entities: Entity[], relationships:
                     id: `attr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     name: colName,
                     type: colType,
+                    length: colLength,
                     isPK,
                     isFK,
                     isNullable,

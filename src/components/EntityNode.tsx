@@ -3,14 +3,28 @@ import { Handle, Position, type NodeProps } from 'reactflow';
 import type { Entity, Attribute } from '../types/erd';
 import { Database, Key, Link, Plus, Trash2, X, Lock, Unlock, MessageSquare } from 'lucide-react';
 import { useERDStore } from '../store/erdStore';
+import { useProjectStore } from '../store/projectStore';
+import type { DBType } from '../types/erd';
+
+const DATA_TYPES: Record<DBType, string[]> = {
+    MySQL: ['INT', 'BIGINT', 'VARCHAR', 'TEXT', 'DATETIME', 'DATE', 'DECIMAL', 'ENUM', 'JSON', 'BOOLEAN', 'TINYINT', 'BLOB'],
+    PostgreSQL: ['INTEGER', 'BIGINT', 'VARCHAR', 'TEXT', 'TIMESTAMP', 'DATE', 'NUMERIC', 'BOOLEAN', 'UUID', 'JSONB', 'BYTEA', 'SERIAL'],
+    Oracle: ['NUMBER', 'VARCHAR2', 'CLOB', 'DATE', 'TIMESTAMP', 'RAW', 'BLOB', 'CHAR'],
+    MSSQL: ['INT', 'BIGINT', 'VARCHAR', 'NVARCHAR', 'TEXT', 'DATETIME', 'DATE', 'DECIMAL', 'BIT', 'UNIQUEIDENTIFIER', 'IMAGE']
+};
 
 interface EntityNodeData {
     entity: Entity;
 }
 
-const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
+const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => {
     const { entity } = data;
     const { updateEntity, deleteEntity } = useERDStore();
+    const { projects, currentProjectId } = useProjectStore();
+    const currentProject = projects.find(p => p.id === currentProjectId);
+    const dbType = currentProject?.dbType || 'MySQL';
+    const availableTypes = DATA_TYPES[dbType];
+
     const isLocked = entity.isLocked ?? true; // Default to locked
 
     const handleNameChange = (newName: string) => {
@@ -29,7 +43,8 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
         const newAttr: Attribute = {
             id: `attr_${Date.now()}`,
             name: 'new_column',
-            type: 'VARCHAR(255)',
+            type: availableTypes[0] || 'VARCHAR',
+            length: availableTypes[0] === 'VARCHAR' || availableTypes[0] === 'VARCHAR2' || availableTypes[0] === 'NVARCHAR' ? '255' : '',
             isPK: false,
             isFK: false,
             isNullable: true,
@@ -62,10 +77,14 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
         }
     };
 
-
     return (
         <div
-            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group relative ${isLocked ? 'border-gray-200 shadow-sm' : 'border-blue-500 shadow-blue-100'}`}
+            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group relative overflow-hidden ${selected
+                ? 'border-orange-500 shadow-orange-200 shadow-lg ring-2 ring-orange-300 ring-offset-2'
+                : isLocked
+                    ? 'border-gray-200 shadow-sm'
+                    : 'border-blue-500 shadow-blue-100'
+                }`}
         >
             {/* Locking Mask Overlay */}
             {isLocked && (
@@ -181,20 +200,30 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                             {/* 1. Type Column (Fixed Width) */}
                             <div className="w-16 flex-shrink-0">
                                 <select
-                                    value={attr.type}
+                                    value={attr.type.includes('(') ? attr.type.split('(')[0] : attr.type}
                                     onChange={(e) => handleUpdateAttribute(e as any, attr.id, { type: e.target.value })}
                                     onMouseDown={(e) => !isLocked && e.stopPropagation()}
                                     disabled={isLocked}
                                     className={`bg-transparent border-none focus:ring-0 text-[10px] outline-none w-full appearance-none transition-colors ${!isLocked ? 'nodrag text-blue-600 hover:text-blue-800 cursor-pointer' : 'text-gray-400 pointer-events-none'}`}
                                 >
-                                    <option value="INT">INT</option>
-                                    <option value="BIGINT">BIGINT</option>
-                                    <option value="VARCHAR(255)">VARCHAR</option>
-                                    <option value="TEXT">TEXT</option>
-                                    <option value="BOOLEAN">BOOL</option>
-                                    <option value="DATE">DATE</option>
-                                    <option value="DATETIME">DATETIME</option>
+                                    {availableTypes.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
                                 </select>
+                            </div>
+
+                            {/* 1.5 Length Column (Small Input) */}
+                            <div className="w-10 flex-shrink-0">
+                                <input
+                                    type="text"
+                                    value={attr.length || ''}
+                                    onChange={(e) => handleUpdateAttribute(e as any, attr.id, { length: e.target.value })}
+                                    onMouseDown={(e) => !isLocked && e.stopPropagation()}
+                                    disabled={isLocked}
+                                    className={`w-full bg-gray-50/50 border-gray-100 border rounded text-[9px] px-1 py-0.5 outline-none focus:border-blue-300 focus:bg-white transition-all ${isLocked ? 'text-gray-400 opacity-50' : 'text-blue-500'}`}
+                                    placeholder="len"
+                                    title="Data Length"
+                                />
                             </div>
 
                             {/* 2. NN Toggle Column (Fixed Width) */}
@@ -260,7 +289,8 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data }) => {
                                 <button
                                     onClick={(e) => handleDeleteAttribute(e, attr.id)}
                                     onMouseDown={(e) => e.stopPropagation()}
-                                    className="nodrag opacity-0 group-attr/attr:opacity-100 transition-opacity p-1 text-red-300 hover:text-red-500"
+                                    className="nodrag opacity-0 group-hover/attr:opacity-100 transition-opacity p-1 text-red-300 hover:text-red-500"
+                                    title="Delete column"
                                 >
                                     <Trash2 size={12} />
                                 </button>

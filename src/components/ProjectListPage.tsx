@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, FolderOpen, Trash2, Clock, ChevronRight, LogOut, Database } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useAuthStore } from '../store/authStore';
+import { type DBType } from '../types/erd';
 
 const ProjectListPage: React.FC = () => {
     const { projects, addProject, deleteProject, setCurrentProject } = useProjectStore();
@@ -9,11 +10,12 @@ const ProjectListPage: React.FC = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');
+    const [newProjectDbType, setNewProjectDbType] = useState<DBType>('MySQL');
 
     const handleCreateProject = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim()) return;
-        const project = addProject(newProjectName, newProjectDesc);
+        const project = addProject(newProjectName, newProjectDbType, newProjectDesc);
         setNewProjectName('');
         setNewProjectDesc('');
         setIsCreateModalOpen(false);
@@ -93,8 +95,13 @@ const ProjectListPage: React.FC = () => {
                                 className="group bg-white rounded-[28px] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 transition-all cursor-pointer flex flex-col h-full ring-0 hover:ring-2 ring-blue-500/20"
                             >
                                 <div className="flex items-start justify-between mb-6">
-                                    <div className="p-3 bg-gray-50 text-blue-500 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
-                                        <Database size={24} />
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-3 bg-gray-50 text-blue-500 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                                            <Database size={24} />
+                                        </div>
+                                        <div className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                            {project.dbType}
+                                        </div>
                                     </div>
                                     <button
                                         onClick={(e) => {
@@ -157,6 +164,25 @@ const ProjectListPage: React.FC = () => {
                                     placeholder="예: 쇼핑몰 서비스 설계"
                                     className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">데이터베이스 엔진</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {(['MySQL', 'PostgreSQL', 'Oracle', 'MSSQL'] as DBType[]).map((type) => (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            onClick={() => setNewProjectDbType(type)}
+                                            className={`py-3 px-4 rounded-2xl border-2 transition-all font-bold text-sm flex items-center justify-center gap-2 ${newProjectDbType === type
+                                                ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-sm shadow-blue-100'
+                                                : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                                                }`}
+                                        >
+                                            <div className={`w-2 h-2 rounded-full ${newProjectDbType === type ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">설명 (선택사항)</label>

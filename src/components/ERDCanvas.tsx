@@ -22,12 +22,14 @@ import ERDEdge from './ERDEdge';
 import EdgeEditModal from './EdgeEditModal';
 import ImportModal from './ImportModal';
 import Sidebar from './Sidebar';
+import HistoryModal from './HistoryModal';
 import { useERDStore } from '../store/erdStore';
 import { type Relationship } from '../types/erd';
 import { useAuthStore } from '../store/authStore';
 import { useProjectStore } from '../store/projectStore';
-import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as UserIcon, Home, Layout, ArrowDown, ArrowRight, ChevronDown, Frame } from 'lucide-react';
+import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as UserIcon, Home, Layout, ArrowDown, ArrowRight, ChevronDown, Frame, Zap, Undo2, Redo2, History } from 'lucide-react';
 import { getLayoutedElements } from '../utils/layout';
+import { getForceLayoutedElements } from '../utils/forceLayout';
 
 const nodeTypes: NodeTypes = {
     entity: EntityNode,
@@ -42,12 +44,16 @@ const ERDCanvasContent: React.FC = () => {
         entities,
         relationships,
         addEntity,
-        updateEntity,
+        updateEntities,
         addRelationship,
         updateRelationship,
         deleteRelationship,
         exportData,
-        importData
+        importData,
+        undo,
+        redo,
+        canUndo,
+        canRedo
     } = useERDStore();
 
     const { user, logout } = useAuthStore();
@@ -60,10 +66,11 @@ const ERDCanvasContent: React.FC = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [editingRelationship, setEditingRelationship] = useState<Relationship | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
     const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
     const flowWrapper = React.useRef<HTMLDivElement>(null);
-    const { getViewport } = useReactFlow();
+    const { getViewport, getNodes } = useReactFlow();
 
     // Initial load of project data into ERDStore
     useEffect(() => {
@@ -85,16 +92,47 @@ const ERDCanvasContent: React.FC = () => {
         }
     }, [entities, relationships, currentProjectId, updateProjectData]);
 
-    // Convert entities to ReactFlow nodes
     useEffect(() => {
-        const flowNodes: Node[] = entities.map((entity) => ({
-            id: entity.id,
-            type: 'entity',
-            position: entity.position,
-            data: { entity },
-        }));
-        setNodes(flowNodes);
+        setNodes((prevNodes) => {
+            return entities.map((entity) => {
+                const existingNode = prevNodes.find((n) => n.id === entity.id);
+                return {
+                    id: entity.id,
+                    type: 'entity',
+                    position: entity.position,
+                    data: { entity },
+                    // Preserve selected state from React Flow's internal state
+                    selected: existingNode?.selected,
+                };
+            });
+        });
     }, [entities, setNodes]);
+
+    // Keyboard shortcuts for Undo/Redo
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const isMod = e.metaKey || e.ctrlKey;
+
+            if (isMod && e.key === 'z') {
+                if (e.shiftKey) {
+                    // Redo (Cmd+Shift+Z)
+                    e.preventDefault();
+                    redo();
+                } else {
+                    // Undo (Cmd+Z)
+                    e.preventDefault();
+                    undo();
+                }
+            } else if (isMod && e.key === 'y') {
+                // Redo (Cmd+Y)
+                e.preventDefault();
+                redo();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [undo, redo]);
 
     // Convert relationships to ReactFlow edges
     useEffect(() => {
@@ -142,36 +180,31 @@ const ERDCanvasContent: React.FC = () => {
     }, [relationships]);
 
     const onConnect = useCallback(
-        (params: Connection) => {
-            if (params.source && params.target && params.source !== params.target) {
-                // Use the ID we started dragging, or find by endpoints
-                const targetId = reconnectingEdgeId || relationships.find(rel =>
-                    (rel.source === params.source && rel.target === params.target) ||
-                    (rel.source === params.target && rel.target === params.source)
-                )?.id;
-
-                if (targetId) {
-                    updateRelationship(targetId, {
-                        source: params.source,
-                        target: params.target,
-                        sourceHandle: params.sourceHandle || undefined,
-                        targetHandle: params.targetHandle || undefined,
-                    });
+        (connection: Connection) => {
+            if (connection.source && connection.target && connection.source !== connection.target) {
+                if (reconnectingEdgeId) {
+                    updateRelationship(reconnectingEdgeId, {
+                        source: connection.source,
+                        target: connection.target,
+                        sourceHandle: connection.sourceHandle || undefined,
+                        targetHandle: connection.targetHandle || undefined,
+                    }, user);
+                    setReconnectingEdgeId(null);
                 } else {
                     const newRelationship = {
                         id: `rel_${Date.now()}`,
-                        source: params.source,
-                        target: params.target,
-                        sourceHandle: params.sourceHandle || undefined,
-                        targetHandle: params.targetHandle || undefined,
-                        type: '1:N' as const,
+                        source: connection.source,
+                        target: connection.target,
+                        sourceHandle: connection.sourceHandle || undefined,
+                        targetHandle: connection.targetHandle || undefined,
+                        type: '1:N' as const, // Default relationship type
                     };
-                    addRelationship(newRelationship);
+                    addRelationship(newRelationship, user);
                 }
             }
             setReconnectingEdgeId(null);
         },
-        [relationships, reconnectingEdgeId, addRelationship, updateRelationship]
+        [reconnectingEdgeId, addRelationship, updateRelationship, user]
     );
 
     const onConnectEnd = useCallback(() => {
@@ -190,10 +223,10 @@ const ERDCanvasContent: React.FC = () => {
                 target: newConnection.target || oldEdge.target,
                 sourceHandle: newConnection.sourceHandle || undefined,
                 targetHandle: newConnection.targetHandle || undefined,
-            });
+            }, user); // 4. user 객체 전달
             setReconnectingEdgeId(null);
         },
-        [updateRelationship]
+        [updateRelationship, user]
     );
 
     const onReconnectEnd = useCallback(() => {
@@ -207,10 +240,23 @@ const ERDCanvasContent: React.FC = () => {
         }
     }, [relationships]);
 
-    const handleAddEntity = () => {
+    const handleAddEntity = useCallback(() => {
+        // Generate unique entity name
+        const baseName = 'New Entity';
+        const existingNames = new Set(entities.map(e => e.name));
+
+        let newName = baseName;
+        if (existingNames.has(baseName)) {
+            let counter = 1;
+            while (existingNames.has(`${baseName}(${counter})`)) {
+                counter++;
+            }
+            newName = `${baseName}(${counter})`;
+        }
+
         const newEntity = {
             id: `entity_${Date.now()}`,
-            name: 'New Entity',
+            name: newName,
             position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
             attributes: [
                 {
@@ -223,8 +269,8 @@ const ERDCanvasContent: React.FC = () => {
             ],
             isLocked: false,
         };
-        addEntity(newEntity);
-    };
+        addEntity(newEntity, user); // 4. user 객체 전달
+    }, [entities, addEntity, user]);
 
     const handleExport = () => {
         const data = exportData();
@@ -349,9 +395,36 @@ const ERDCanvasContent: React.FC = () => {
         setIsLayoutMenuOpen(false);
     }, [nodes, edges, entities, relationships, setNodes, setEdges, importData, getViewport]);
 
-    const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
-        updateEntity(node.id, { position: node.position });
-    }, [updateEntity]);
+    const onForceLayout = useCallback(() => {
+        const { nodes: layoutedNodes } = getForceLayoutedElements(nodes, edges);
+
+        setNodes(layoutedNodes);
+
+        // Sync with store
+        const updatedEntities = entities.map(entity => {
+            const layoutNode = layoutedNodes.find(n => n.id === entity.id);
+            if (layoutNode) {
+                return { ...entity, position: layoutNode.position };
+            }
+            return entity;
+        });
+
+        importData({
+            entities: updatedEntities,
+            relationships: relationships
+        });
+        setIsLayoutMenuOpen(false);
+    }, [nodes, edges, entities, relationships, setNodes, importData]);
+
+    const onNodeDragStop = useCallback(() => {
+        // Use getNodes() to get the absolute latest positions of ALL nodes in the flow
+        const flowNodes = getNodes();
+        const updates = flowNodes.map(node => ({
+            id: node.id,
+            updates: { position: node.position }
+        }));
+        updateEntities(updates);
+    }, [getNodes, updateEntities]);
 
     return (
         <div className="flex w-full h-screen overflow-hidden bg-gray-50">
@@ -442,10 +515,51 @@ const ERDCanvasContent: React.FC = () => {
                                     <Frame size={16} className="text-orange-500" />
                                     <span>화면 내 세로 정렬</span>
                                 </button>
+                                <div className="h-[1px] bg-gray-100 my-1" />
+                                <button
+                                    onClick={onForceLayout}
+                                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors text-left"
+                                >
+                                    <Zap size={16} className="text-yellow-500" />
+                                    <span>자동 분산 정렬 (Force)</span>
+                                </button>
                             </div>
                         )}
                     </div>
 
+                    <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
+
+                    <div className="flex bg-gray-50/50 rounded-lg border border-gray-100 p-0.5">
+                        <button
+                            onClick={undo}
+                            disabled={!canUndo}
+                            className={`p-2 rounded-md transition-all ${canUndo ? 'text-gray-700 hover:bg-white hover:shadow-sm active:scale-95' : 'text-gray-200 cursor-not-allowed'}`}
+                            title="Undo (Cmd+Z)"
+                        >
+                            <Undo2 size={18} />
+                        </button>
+                        <div className="w-[1px] h-4 bg-gray-200 self-center mx-0.5" />
+                        <button
+                            onClick={redo}
+                            disabled={!canRedo}
+                            className={`p-2 rounded-md transition-all ${canRedo ? 'text-gray-700 hover:bg-white hover:shadow-sm active:scale-95' : 'text-gray-200 cursor-not-allowed'}`}
+                            title="Redo (Cmd+Shift+Z)"
+                        >
+                            <Redo2 size={18} />
+                        </button>
+                    </div>
+
+                    {/* 5. 툴바의 Undo/Redo 버튼 옆에 히스토리 버튼 배치 */}
+                    <button
+                        onClick={() => setIsHistoryModalOpen(true)}
+                        className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm font-bold shadow-sm active:scale-95"
+                        title="변경 이력 보기"
+                    >
+                        <History size={16} className="text-blue-500" />
+                        <span>히스토리</span>
+                    </button>
+
+                    <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
 
                     <button
                         onClick={handleExport}
@@ -490,7 +604,7 @@ const ERDCanvasContent: React.FC = () => {
                             <LogOut size={18} />
                         </button>
                     </div>
-                </div>
+                </div> {/* This closes the toolbar div from line 481 */}
 
                 {/* React Flow Canvas */}
                 <ReactFlow
@@ -518,6 +632,8 @@ const ERDCanvasContent: React.FC = () => {
                     minZoom={0.05}
                     maxZoom={4}
                     fitView
+                    multiSelectionKeyCode="Shift"
+                    selectionKeyCode="Shift"
                 >
                     <Controls />
                     <MiniMap
@@ -537,14 +653,21 @@ const ERDCanvasContent: React.FC = () => {
                     <ImportModal onClose={() => setIsImportModalOpen(false)} />
                 )}
 
+                {isHistoryModalOpen && (
+                    <HistoryModal
+                        isOpen={isHistoryModalOpen}
+                        onClose={() => setIsHistoryModalOpen(false)}
+                    />
+                )}
+
                 {editingRelationship && (
                     <EdgeEditModal
                         relationship={editingRelationship}
                         sourceEntityName={entities.find(e => e.id === editingRelationship.source)?.name || 'Unknown'}
                         targetEntityName={entities.find(e => e.id === editingRelationship.target)?.name || 'Unknown'}
-                        onSave={(updated) => updateRelationship(updated.id, updated)}
+                        onSave={(updated) => updateRelationship(updated.id, updated, user)}
                         onDelete={() => {
-                            deleteRelationship(editingRelationship.id);
+                            deleteRelationship(editingRelationship.id, user);
                             setEditingRelationship(null);
                         }}
                         onClose={() => setEditingRelationship(null)}
