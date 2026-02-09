@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, Download, Code, Check } from 'lucide-react';
 import { useERDStore } from '../store/erdStore';
+import { useSyncStore } from '../store/syncStore';
+import { useAuthStore } from '../store/authStore';
 import { parseSQLToERD } from '../utils/sqlParser';
 
 interface ImportModalProps {
@@ -9,6 +11,8 @@ interface ImportModalProps {
 
 const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
     const { entities, mergeData } = useERDStore();
+    const { sendOperation } = useSyncStore();
+    const { user } = useAuthStore();
     const [tab, setTab] = useState<'file' | 'code'>('file');
     const [sqlCode, setSqlCode] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -22,14 +26,39 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
 
     const processImport = (data: any) => {
         const duplicateNames = checkDuplicates(data);
+        let overwrite = false;
 
         if (duplicateNames.length > 0) {
             const message = `다음 테이블이 이미 존재합니다: ${duplicateNames.join(', ')}.\n\n기존 테이블을 덮어쓰시겠습니까?\n(확인을 누르면 덮어쓰고, 취소를 누르면 중복을 제외한 새 테이블만 추가합니다)`;
-            const overwrite = window.confirm(message);
+            overwrite = window.confirm(message);
             mergeData(data, overwrite);
         } else {
             mergeData(data, false);
         }
+
+        // Broadcast the imported data to others
+        // We send operations for all entities and relationships in the imported data
+        // Other clients will ignore if ID already exists due to our erdStore safety checks
+        data.entities.forEach((entity: any) => {
+            sendOperation({
+                type: 'ENTITY_CREATE',
+                targetId: entity.id,
+                userId: user?.id || 'anonymous',
+                userName: user?.name || 'Anonymous',
+                payload: entity as unknown as Record<string, unknown>
+            });
+        });
+
+        data.relationships.forEach((rel: any) => {
+            sendOperation({
+                type: 'RELATIONSHIP_CREATE',
+                targetId: rel.id,
+                userId: user?.id || 'anonymous',
+                userName: user?.name || 'Anonymous',
+                payload: rel as unknown as Record<string, unknown>
+            });
+        });
+
         onClose();
     };
 
