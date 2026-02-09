@@ -5,6 +5,7 @@ import { Database, Key, Link, Plus, Trash2, X, Lock, Unlock, MessageSquare } fro
 import { useERDStore } from '../store/erdStore';
 import { useProjectStore } from '../store/projectStore';
 import type { DBType } from '../types/erd';
+import { EntityLockBadge, useEntityLock } from './collaboration';
 
 const DATA_TYPES: Record<DBType, string[]> = {
     MySQL: ['INT', 'BIGINT', 'VARCHAR', 'TEXT', 'DATETIME', 'DATE', 'DECIMAL', 'ENUM', 'JSON', 'BOOLEAN', 'TINYINT', 'BLOB'],
@@ -25,7 +26,9 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
     const dbType = currentProject?.dbType || 'MySQL';
     const availableTypes = DATA_TYPES[dbType];
 
-    const isLocked = entity.isLocked ?? true; // Default to locked
+    const { isLockedByOther, lockedBy, requestLock, releaseLock } = useEntityLock(entity.id);
+    const isLocalLocked = entity.isLocked ?? true; // Default to locked
+    const isLocked = isLocalLocked || isLockedByOther;
 
     const handleNameChange = (newName: string) => {
         if (isLocked) return;
@@ -34,7 +37,20 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
 
     const handleToggleLock = (e: React.MouseEvent) => {
         e.stopPropagation();
-        updateEntity(entity.id, { isLocked: !isLocked });
+
+        if (isLockedByOther) {
+            alert(`Locked by ${lockedBy}`);
+            return;
+        }
+
+        const newLockedState = !isLocalLocked;
+        updateEntity(entity.id, { isLocked: newLockedState });
+
+        if (!newLockedState) {
+            requestLock();
+        } else {
+            releaseLock();
+        }
     };
 
     const handleAddAttribute = (e: React.MouseEvent) => {
@@ -86,16 +102,20 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
                     : 'border-blue-500 shadow-blue-100'
                 }`}
         >
+            <EntityLockBadge entityId={entity.id} />
+
             {/* Locking Mask Overlay */}
-            {isLocked && (
+            {isLocalLocked && (
                 <div
                     onDoubleClick={handleToggleLock}
                     className="absolute inset-0 z-[100] flex items-center justify-center cursor-pointer group/mask hover:bg-white/30 transition-all duration-300"
-                    title="더블 클릭하여 잠금 해제"
+                    title={isLockedByOther ? `Locked by ${lockedBy}` : "더블 클릭하여 잠금 해제"}
                 >
                     <div className="bg-white/90 p-3 rounded-full shadow-lg border border-gray-100 opacity-0 group-hover/mask:opacity-100 transition-all transform scale-90 group-hover/mask:scale-100 flex flex-col items-center gap-1">
-                        <Lock size={20} className="text-gray-400" />
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Double Click to Edit</span>
+                        <Lock size={20} className={isLockedByOther ? "text-red-500" : "text-gray-400"} />
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                            {isLockedByOther ? lockedBy : "Double Click to Edit"}
+                        </span>
                     </div>
                 </div>
             )}

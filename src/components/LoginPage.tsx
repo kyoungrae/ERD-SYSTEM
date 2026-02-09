@@ -70,7 +70,7 @@ const LoginPage: React.FC = () => {
                     </div>
 
                     <div className="mt-12 text-sm text-blue-200/60 relative z-10">
-                        © 2026 이경태. All rights reserved.
+                        © 2026 2QuadrillionTae. All rights reserved.
                     </div>
                 </div>
 
@@ -89,6 +89,22 @@ const LoginPage: React.FC = () => {
                             >
                                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
                                 <span className="font-semibold text-gray-700">Google 계정으로 로그인</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    const guestUser = {
+                                        id: `guest_${Math.floor(Math.random() * 10000)}`,
+                                        email: 'guest@test.com',
+                                        name: `게스트 ${Math.floor(Math.random() * 100)}`,
+                                        picture: undefined,
+                                    };
+                                    setCurrentProject(null);
+                                    login(guestUser);
+                                }}
+                                className="w-full flex items-center justify-center gap-3 py-4 border-2 border-gray-100 rounded-2xl hover:bg-gray-50 hover:border-gray-200 transition-all duration-200 group active:scale-[0.98]"
+                            >
+                                <span className="font-semibold text-gray-700">게스트로 로그인 (테스트용)</span>
                             </button>
 
                             <div className="relative py-6">

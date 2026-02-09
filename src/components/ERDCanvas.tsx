@@ -14,6 +14,7 @@ import ReactFlow, {
     ReactFlowProvider,
     PanOnScrollMode,
     useReactFlow,
+    useViewport,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -27,6 +28,8 @@ import { useERDStore } from '../store/erdStore';
 import { type Relationship } from '../types/erd';
 import { useAuthStore } from '../store/authStore';
 import { useProjectStore } from '../store/projectStore';
+import { useSyncStore } from '../store/syncStore';
+import { OnlineUsers, UserCursors } from './collaboration';
 import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as UserIcon, Home, Layout, ArrowDown, ArrowRight, ChevronDown, Frame, Zap, Undo2, Redo2, History } from 'lucide-react';
 import { getLayoutedElements } from '../utils/layout';
 import { getForceLayoutedElements } from '../utils/forceLayout';
@@ -39,12 +42,28 @@ const edgeTypes = {
     erd: ERDEdge,
 };
 
+const UserCursorsLayer: React.FC = () => {
+    const { x, y, zoom } = useViewport();
+    return (
+        <div
+            className="absolute top-0 left-0 w-full h-full pointer-events-none z-50 origin-top-left"
+            style={{ transform: `translate(${x}px, ${y}px) scale(${zoom})` }}
+        >
+            <UserCursors />
+        </div>
+    );
+};
+
+
+
 const ERDCanvasContent: React.FC = () => {
     const {
         entities,
         relationships,
         addEntity,
+        updateEntity,
         updateEntities,
+        deleteEntity,
         addRelationship,
         updateRelationship,
         deleteRelationship,
@@ -70,7 +89,86 @@ const ERDCanvasContent: React.FC = () => {
     const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
     const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
     const flowWrapper = React.useRef<HTMLDivElement>(null);
-    const { getViewport, getNodes } = useReactFlow();
+    const { getViewport, getNodes, screenToFlowPosition } = useReactFlow();
+
+    // Collaboration Store
+    const { updateCursor } = useSyncStore();
+
+    // Broadcast cursor position
+    const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
+        const position = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
+
+
+
+        updateCursor({ ...position });
+    }, [screenToFlowPosition, getViewport, updateCursor]);
+
+
+    // Handle remote operations
+    useEffect(() => {
+        const handleRemoteOperation = (e: CustomEvent<any>) => {
+            const op = e.detail;
+            if (!op) return;
+
+            const remoteUser: any = {
+                id: op.userId || 'remote',
+                name: op.userName || 'Remote User',
+                email: 'remote@user.com',
+                picture: ''
+            };
+
+            switch (op.type) {
+                case 'ENTITY_CREATE':
+                    addEntity(op.payload, remoteUser);
+                    break;
+                case 'ENTITY_UPDATE':
+                case 'ENTITY_MOVE':
+                    updateEntity(op.targetId, op.payload, remoteUser);
+                    break;
+                case 'ENTITY_DELETE':
+                    deleteEntity(op.targetId, remoteUser);
+                    break;
+                case 'ATTRIBUTE_ADD':
+                case 'ATTRIBUTE_UPDATE':
+                case 'ATTRIBUTE_DELETE':
+                    // Payload should contain full attributes list for these operations based on SyncEngine logic
+                    if (op.payload.attributes) {
+                        updateEntity(op.targetId, { attributes: op.payload.attributes }, remoteUser);
+                    }
+                    break;
+                case 'RELATIONSHIP_CREATE':
+                    addRelationship(op.payload, remoteUser);
+                    break;
+                case 'RELATIONSHIP_UPDATE':
+                    updateRelationship(op.targetId, op.payload, remoteUser);
+                    break;
+                case 'RELATIONSHIP_DELETE':
+                    deleteRelationship(op.targetId, remoteUser);
+                    break;
+            }
+        };
+
+        window.addEventListener('erd:remote_operation', handleRemoteOperation as EventListener);
+        return () => window.removeEventListener('erd:remote_operation', handleRemoteOperation as EventListener);
+    }, [addEntity, updateEntity, deleteEntity, addRelationship, updateRelationship, deleteRelationship]);
+
+    // Handle state sync (initial load from server)
+    useEffect(() => {
+        const handleStateSync = (e: CustomEvent<any>) => {
+            const state = e.detail;
+            if (!state) return;
+            console.log('Applying synced state:', state);
+            importData(state);
+        };
+
+        window.addEventListener('erd:state_sync', handleStateSync as EventListener);
+        return () => window.removeEventListener('erd:state_sync', handleStateSync as EventListener);
+    }, [importData]);
+
 
     // Initial load of project data into ERDStore
     useEffect(() => {
@@ -464,6 +562,23 @@ const ERDCanvasContent: React.FC = () => {
 
                     <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
 
+                    <div className="flex flex-col justify-center px-1 mr-2" title="클릭하여 ID 복사">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Project ID</span>
+                        <button
+                            onClick={() => {
+                                if (currentProject?.id) {
+                                    navigator.clipboard.writeText(currentProject.id);
+                                    alert('프로젝트 ID가 복사되었습니다: ' + currentProject.id);
+                                }
+                            }}
+                            className="text-xs font-mono font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"
+                        >
+                            {currentProject?.id}
+                        </button>
+                    </div>
+
+                    <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
+
                     <button
                         onClick={handleAddEntity}
                         className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm font-bold shadow-md hover:shadow-lg active:scale-95"
@@ -579,6 +694,13 @@ const ERDCanvasContent: React.FC = () => {
 
                     <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
 
+                    {/* Online Users */}
+                    <div className="flex items-center gap-2 px-1">
+                        <OnlineUsers />
+                    </div>
+
+                    <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
+
                     {/* User Profile & Logout */}
                     <div className="flex items-center gap-2 px-1">
                         <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 bg-gray-50 rounded-lg border border-gray-100">
@@ -634,7 +756,9 @@ const ERDCanvasContent: React.FC = () => {
                     fitView
                     multiSelectionKeyCode="Shift"
                     selectionKeyCode="Shift"
+                    onPaneMouseMove={onPaneMouseMove}
                 >
+                    <UserCursorsLayer />
                     <Controls />
                     <MiniMap
                         nodeColor={() => '#3b82f6'}

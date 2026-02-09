@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { type DBType, type ProjectMember } from '../types/erd';
 
 const ProjectListPage: React.FC = () => {
-    const { projects, addProject, deleteProject, setCurrentProject, updateProjectMembers } = useProjectStore();
+    const { projects, addProject, addRemoteProject, deleteProject, setCurrentProject, updateProjectMembers } = useProjectStore();
     const { user, logout } = useAuthStore();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingMembersProject, setEditingMembersProject] = useState<string | null>(null);
@@ -131,13 +131,41 @@ const ProjectListPage: React.FC = () => {
                         <h2 className="text-3xl font-black text-gray-900 mb-2">내 프로젝트</h2>
                         <p className="text-gray-500 font-medium">관리 중인 모든 ERD 다이어그램 리스트입니다.</p>
                     </div>
-                    <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95 whitespace-nowrap"
-                    >
-                        <Plus size={20} />
-                        새 프로젝트 생성
-                    </button>
+                    <div className="flex gap-3">
+                        <div className="relative flex items-center">
+                            <input
+                                type="text"
+                                placeholder="프로젝트 ID 입력"
+                                className="pl-4 pr-12 py-3.5 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm w-48 shadow-sm"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const target = e.target as HTMLInputElement;
+                                        if (target.value.trim()) {
+                                            addRemoteProject(target.value.trim());
+                                        }
+                                    }
+                                }}
+                            />
+                            <button
+                                onClick={(e) => {
+                                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                    if (input.value.trim()) {
+                                        addRemoteProject(input.value.trim());
+                                    }
+                                }}
+                                className="absolute right-2 p-1.5 bg-gray-100 text-gray-500 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95 whitespace-nowrap"
+                        >
+                            <Plus size={20} />
+                            새 프로젝트 생성
+                        </button>
+                    </div>
                 </div>
 
                 {/* Project Grid */}
@@ -457,7 +485,7 @@ const ProjectListPage: React.FC = () => {
             )}
 
             <footer className="py-10 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
-                © 2026 이경태. 모든 권리 보유.
+                © 2026 2QuadrillionTae. 모든 권리 보유.
             </footer>
         </div>
     );

@@ -6,6 +6,7 @@ interface ProjectStore {
     projects: Project[];
     currentProjectId: string | null;
     addProject: (name: string, dbType: DBType, members: ProjectMember[], description?: string) => Project;
+    addRemoteProject: (id: string) => void;
     deleteProject: (id: string) => void;
     setCurrentProject: (id: string | null) => void;
     updateProjectData: (id: string, data: any) => void;
@@ -32,6 +33,27 @@ export const useProjectStore = create<ProjectStore>()(
                     projects: [newProject, ...state.projects],
                 }));
                 return newProject;
+            },
+
+            addRemoteProject: (id) => {
+                set((state) => {
+                    if (state.projects.find((p) => p.id === id)) {
+                        return { currentProjectId: id };
+                    }
+                    const newProject: Project = {
+                        id,
+                        name: `Remote Project (${id.slice(0, 6)}...)`,
+                        dbType: 'MySQL',
+                        description: 'Joined remotely via ID',
+                        members: [],
+                        updatedAt: new Date().toISOString(),
+                        data: { entities: [], relationships: [] },
+                    };
+                    return {
+                        projects: [newProject, ...state.projects],
+                        currentProjectId: id,
+                    };
+                });
             },
 
             deleteProject: (id) =>
