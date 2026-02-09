@@ -6,6 +6,7 @@ import { config } from './config';
 import { connectMongoDB } from './config/database';
 import { redis } from './config/redis';
 import { initializeSocketServer } from './websocket/SocketServer';
+import authRoutes from './routes/authRoutes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -38,6 +39,9 @@ app.use(express.json());
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Routes
+app.use('/api/auth', authRoutes);
 
 // API routes will be added here
 app.get('/api', (req, res) => {
