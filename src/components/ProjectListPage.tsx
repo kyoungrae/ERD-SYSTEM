@@ -105,7 +105,7 @@ const ProjectListPage: React.FC = () => {
 
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-3 pl-2 pr-4 py-1.5 bg-gray-50 rounded-full border border-gray-100">
-                            <img src={user?.picture} alt={user?.name} className="w-8 h-8 rounded-full border-2 border-white shadow-sm" />
+                            <img src={user?.picture} alt="" className="w-8 h-8 rounded-full border-2 border-white shadow-sm" />
                             <span className="text-sm font-bold text-gray-700 hidden sm:block">{user?.name}</span>
                         </div>
                         <button
