@@ -1,5 +1,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Server as HTTPServer } from 'http';
+import { Types } from 'mongoose';
 import { config } from '../config';
 import { syncEngine, type CRDTOperation, type ERDState } from '../services/SyncEngine';
 import { lockManager } from '../services/LockManager';
@@ -20,7 +21,18 @@ interface SocketData {
 export function initializeSocketServer(httpServer: HTTPServer): SocketIOServer {
     const io = new SocketIOServer(httpServer, {
         cors: {
-            origin: config.frontendUrl,
+            origin: (origin, callback) => {
+                const allowed = [
+                    config.frontendUrl,
+                    'http://localhost:5173',
+                    'http://127.0.0.1:5173',
+                ];
+                if (!origin || allowed.includes(origin) || origin.startsWith('http://192.168.')) {
+                    callback(null, true);
+                } else {
+                    callback(new Error('Not allowed by CORS'));
+                }
+            },
             methods: ['GET', 'POST'],
             credentials: true,
         },
@@ -71,20 +83,28 @@ export function initializeSocketServer(httpServer: HTTPServer): SocketIOServer {
 
             // If no state in Redis, load from MongoDB
             if (!state) {
-                const project = await Project.findById(projectId);
-                if (project) {
-                    state = {
-                        entities: project.currentSnapshot.entities,
-                        relationships: project.currentSnapshot.relationships,
-                        version: project.currentSnapshot.version,
-                    };
-                    await projectStateManager.initializeFromDB(
-                        projectId,
-                        state.entities,
-                        state.relationships,
-                        state.version
-                    );
+                // Check if projectId is a valid MongoDB ObjectId
+                if (Types.ObjectId.isValid(projectId)) {
+                    const project = await Project.findById(projectId);
+                    if (project) {
+                        state = {
+                            entities: project.currentSnapshot.entities || [],
+                            relationships: project.currentSnapshot.relationships || [],
+                            version: project.currentSnapshot.version || 0,
+                        };
+                        await projectStateManager.initializeFromDB(
+                            projectId,
+                            state.entities,
+                            state.relationships,
+                            state.version
+                        );
+                    } else {
+                        // Project not found in DB
+                        state = { entities: [], relationships: [], version: 0 };
+                    }
                 } else {
+                    // Invalid ObjectId (e.g. temporary ID 'proj_...'), treat as new empty project
+                    console.log(`ℹ️ Project ID ${projectId} is not a valid ObjectId (likely temporary), initializing empty state.`);
                     state = { entities: [], relationships: [], version: 0 };
                 }
             }
@@ -245,16 +265,20 @@ function debouncedSaveToMongo(projectId: string, state: ERDState): void {
 
     const timer = setTimeout(async () => {
         try {
-            await Project.findByIdAndUpdate(projectId, {
-                currentSnapshot: {
-                    version: state.version,
-                    entities: state.entities,
-                    relationships: state.relationships,
-                    savedAt: new Date(),
-                },
-                updatedAt: new Date(),
-            });
-            console.log(`💾 Project ${projectId} saved to MongoDB`);
+            if (Types.ObjectId.isValid(projectId)) {
+                await Project.findByIdAndUpdate(projectId, {
+                    currentSnapshot: {
+                        version: state.version,
+                        entities: state.entities,
+                        relationships: state.relationships,
+                        savedAt: new Date(),
+                    },
+                    updatedAt: new Date(),
+                });
+                console.log(`💾 Project ${projectId} saved to MongoDB`);
+            } else {
+                console.log(`⚠️ Skipping MongoDB save for temporary Project ID: ${projectId}`);
+            }
         } catch (error) {
             console.error('MongoDB save error:', error);
         }

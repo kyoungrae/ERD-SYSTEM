@@ -13,7 +13,23 @@ const httpServer = createServer(app);
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: config.frontendUrl,
+    origin: (origin, callback) => {
+        // Allow requests with no origin
+        if (!origin) return callback(null, true);
+
+        // Allow specific origins and dynamic patterns
+        const allowed = [
+            config.frontendUrl,
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+        ];
+
+        if (allowed.includes(origin) || origin.startsWith('http://192.168.')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
 }));
 app.use(express.json());

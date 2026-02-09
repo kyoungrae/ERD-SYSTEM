@@ -94,11 +94,16 @@ export const useERDStore = create<ERDStore>((set, get) => {
         canRedo: false,
 
         addEntity: (entity, user) =>
-            set((state) => ({
-                ...pushHistory(state),
-                entities: [...state.entities, entity],
-                history: [createLog(user, 'CREATE', 'ENTITY', entity.name, `Created table: ${entity.name}`), ...state.history].slice(0, 100)
-            })),
+            set((state) => {
+                if (state.entities.some(e => e.id === entity.id)) {
+                    return state;
+                }
+                return {
+                    ...pushHistory(state),
+                    entities: [...state.entities, entity],
+                    history: [createLog(user, 'CREATE', 'ENTITY', entity.name, `Created table: ${entity.name}`), ...state.history].slice(0, 100)
+                };
+            }),
 
         updateEntity: (id, updates, user) =>
             set((state) => {
@@ -189,11 +194,16 @@ export const useERDStore = create<ERDStore>((set, get) => {
             }),
 
         addRelationship: (relationship, user) =>
-            set((state) => ({
-                ...pushHistory(state),
-                relationships: [...state.relationships, relationship],
-                history: [createLog(user, 'CREATE', 'RELATIONSHIP', relationship.id, `Created relationship: ${relationship.type}`), ...state.history].slice(0, 100)
-            })),
+            set((state) => {
+                if (state.relationships.some(r => r.id === relationship.id)) {
+                    return state;
+                }
+                return {
+                    ...pushHistory(state),
+                    relationships: [...state.relationships, relationship],
+                    history: [createLog(user, 'CREATE', 'RELATIONSHIP', relationship.id, `Created relationship: ${relationship.type}`), ...state.history].slice(0, 100)
+                };
+            }),
 
         updateRelationship: (id, updates, user) =>
             set((state) => ({

@@ -62,7 +62,6 @@ const ERDCanvasContent: React.FC = () => {
         relationships,
         addEntity,
         updateEntity,
-        updateEntities,
         deleteEntity,
         addRelationship,
         updateRelationship,
@@ -89,10 +88,10 @@ const ERDCanvasContent: React.FC = () => {
     const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
     const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
     const flowWrapper = React.useRef<HTMLDivElement>(null);
-    const { getViewport, getNodes, screenToFlowPosition } = useReactFlow();
+    const { getViewport, screenToFlowPosition } = useReactFlow();
 
     // Collaboration Store
-    const { updateCursor } = useSyncStore();
+    const { updateCursor, sendOperation } = useSyncStore();
 
     // Broadcast cursor position
     const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
@@ -161,6 +160,44 @@ const ERDCanvasContent: React.FC = () => {
         const handleStateSync = (e: CustomEvent<any>) => {
             const state = e.detail;
             if (!state) return;
+
+            // Check if server returned empty state (restarted/temp project)
+            // but we have local data we want to preserve and sync back
+            const isServerEmpty = !state.entities?.length && !state.relationships?.length;
+            const currentStore = useERDStore.getState();
+            const hasLocalData = currentStore.entities.length > 0 || currentStore.relationships.length > 0;
+
+            if (isServerEmpty && hasLocalData) {
+                console.log('⚠️ Server has empty state but local data exists. Re-broadcasting local state to server...');
+
+                // Re-broadcast all entities and relationships to restore server state
+                // We use a small delay to ensure socket and listeners are ready
+                const { sendOperation } = useSyncStore.getState();
+                const { user } = useAuthStore.getState();
+
+                currentStore.entities.forEach(entity => {
+                    sendOperation({
+                        type: 'ENTITY_CREATE',
+                        targetId: entity.id,
+                        userId: user?.id || 'anonymous',
+                        userName: user?.name || 'Anonymous',
+                        payload: entity as unknown as Record<string, unknown>
+                    });
+                });
+
+                currentStore.relationships.forEach(rel => {
+                    sendOperation({
+                        type: 'RELATIONSHIP_CREATE',
+                        targetId: rel.id,
+                        userId: user?.id || 'anonymous',
+                        userName: user?.name || 'Anonymous',
+                        payload: rel as unknown as Record<string, unknown>
+                    });
+                });
+
+                return; // Do NOT overwrite local data with empty server state
+            }
+
             console.log('Applying synced state:', state);
             importData(state);
         };
@@ -281,12 +318,22 @@ const ERDCanvasContent: React.FC = () => {
         (connection: Connection) => {
             if (connection.source && connection.target && connection.source !== connection.target) {
                 if (reconnectingEdgeId) {
-                    updateRelationship(reconnectingEdgeId, {
+                    const updates = {
                         source: connection.source,
                         target: connection.target,
                         sourceHandle: connection.sourceHandle || undefined,
                         targetHandle: connection.targetHandle || undefined,
-                    }, user);
+                    };
+                    updateRelationship(reconnectingEdgeId, updates, user);
+
+                    sendOperation({
+                        type: 'RELATIONSHIP_UPDATE',
+                        targetId: reconnectingEdgeId,
+                        userId: user?.id || 'anonymous',
+                        userName: user?.name || 'Anonymous',
+                        payload: updates as unknown as Record<string, unknown>
+                    });
+
                     setReconnectingEdgeId(null);
                 } else {
                     const newRelationship = {
@@ -298,11 +345,19 @@ const ERDCanvasContent: React.FC = () => {
                         type: '1:N' as const, // Default relationship type
                     };
                     addRelationship(newRelationship, user);
+
+                    sendOperation({
+                        type: 'RELATIONSHIP_CREATE',
+                        targetId: newRelationship.id,
+                        userId: user?.id || 'anonymous',
+                        userName: user?.name || 'Anonymous',
+                        payload: newRelationship as unknown as Record<string, unknown>
+                    });
                 }
             }
             setReconnectingEdgeId(null);
         },
-        [reconnectingEdgeId, addRelationship, updateRelationship, user]
+        [reconnectingEdgeId, addRelationship, updateRelationship, user, sendOperation]
     );
 
     const onConnectEnd = useCallback(() => {
@@ -316,15 +371,26 @@ const ERDCanvasContent: React.FC = () => {
 
     const onReconnect = useCallback(
         (oldEdge: Edge, newConnection: Connection) => {
-            updateRelationship(oldEdge.id, {
+            const updates = {
                 source: newConnection.source || oldEdge.source,
                 target: newConnection.target || oldEdge.target,
                 sourceHandle: newConnection.sourceHandle || undefined,
                 targetHandle: newConnection.targetHandle || undefined,
-            }, user); // 4. user 객체 전달
+            };
+
+            updateRelationship(oldEdge.id, updates, user); // 4. user 객체 전달
+
+            sendOperation({
+                type: 'RELATIONSHIP_UPDATE',
+                targetId: oldEdge.id,
+                userId: user?.id || 'anonymous',
+                userName: user?.name || 'Anonymous',
+                payload: updates as unknown as Record<string, unknown>
+            });
+
             setReconnectingEdgeId(null);
         },
-        [updateRelationship, user]
+        [updateRelationship, user, sendOperation]
     );
 
     const onReconnectEnd = useCallback(() => {
@@ -368,7 +434,15 @@ const ERDCanvasContent: React.FC = () => {
             isLocked: false,
         };
         addEntity(newEntity, user); // 4. user 객체 전달
-    }, [entities, addEntity, user]);
+
+        sendOperation({
+            type: 'ENTITY_CREATE',
+            targetId: newEntity.id,
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: newEntity as unknown as Record<string, unknown>
+        });
+    }, [entities, addEntity, user, sendOperation]);
 
     const handleExport = () => {
         const data = exportData();
@@ -431,7 +505,7 @@ const ERDCanvasContent: React.FC = () => {
 
         let finalNodes = layoutedNodes;
 
-        // If we only laid out a subset, we need to position them relative to where they were, 
+        // If we only laid out a subset, we need to position them relative to where they were,
         // essentially centering the new group in the bounding box of the old group.
         if (scope === 'VISIBLE') {
             const getBounds = (nodeList: Node[]) => {
@@ -490,8 +564,21 @@ const ERDCanvasContent: React.FC = () => {
             entities: updatedEntities,
             relationships: relationships
         });
+
+
+        // Broadcast Batch Move
+        finalNodes.forEach(node => {
+            sendOperation({
+                type: 'ENTITY_MOVE',
+                targetId: node.id,
+                userId: user?.id || 'anonymous',
+                userName: user?.name || 'Anonymous',
+                payload: { position: node.position }
+            });
+        });
+
         setIsLayoutMenuOpen(false);
-    }, [nodes, edges, entities, relationships, setNodes, setEdges, importData, getViewport]);
+    }, [nodes, edges, entities, relationships, setNodes, setEdges, importData, getViewport, sendOperation, user]);
 
     const onForceLayout = useCallback(() => {
         const { nodes: layoutedNodes } = getForceLayoutedElements(nodes, edges);
@@ -511,18 +598,34 @@ const ERDCanvasContent: React.FC = () => {
             entities: updatedEntities,
             relationships: relationships
         });
-        setIsLayoutMenuOpen(false);
-    }, [nodes, edges, entities, relationships, setNodes, importData]);
 
-    const onNodeDragStop = useCallback(() => {
-        // Use getNodes() to get the absolute latest positions of ALL nodes in the flow
-        const flowNodes = getNodes();
-        const updates = flowNodes.map(node => ({
-            id: node.id,
-            updates: { position: node.position }
-        }));
-        updateEntities(updates);
-    }, [getNodes, updateEntities]);
+        // Broadcast Batch Move
+        layoutedNodes.forEach(node => {
+            sendOperation({
+                type: 'ENTITY_MOVE',
+                targetId: node.id,
+                userId: user?.id || 'anonymous',
+                userName: user?.name || 'Anonymous',
+                payload: { position: node.position }
+            });
+        });
+
+        setIsLayoutMenuOpen(false);
+    }, [nodes, edges, entities, relationships, setNodes, importData, sendOperation, user]);
+
+    const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
+        // Update local
+        updateEntity(node.id, { position: node.position }, user);
+
+        // Broadcast
+        sendOperation({
+            type: 'ENTITY_MOVE',
+            targetId: node.id,
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: { position: node.position }
+        });
+    }, [updateEntity, user, sendOperation]);
 
     return (
         <div className="flex w-full h-screen overflow-hidden bg-gray-50">

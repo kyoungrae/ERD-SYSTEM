@@ -4,6 +4,8 @@ import type { Entity, Attribute } from '../types/erd';
 import { Database, Key, Link, Plus, Trash2, X, Lock, Unlock, MessageSquare } from 'lucide-react';
 import { useERDStore } from '../store/erdStore';
 import { useProjectStore } from '../store/projectStore';
+import { useSyncStore } from '../store/syncStore';
+import { useAuthStore } from '../store/authStore';
 import type { DBType } from '../types/erd';
 import { EntityLockBadge, useEntityLock } from './collaboration';
 
@@ -22,6 +24,8 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
     const { entity } = data;
     const { updateEntity, deleteEntity } = useERDStore();
     const { projects, currentProjectId } = useProjectStore();
+    const { sendOperation } = useSyncStore();
+    const { user } = useAuthStore();
     const currentProject = projects.find(p => p.id === currentProjectId);
     const dbType = currentProject?.dbType || 'MySQL';
     const availableTypes = DATA_TYPES[dbType];
@@ -33,6 +37,14 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
     const handleNameChange = (newName: string) => {
         if (isLocked) return;
         updateEntity(entity.id, { name: newName });
+
+        sendOperation({
+            type: 'ENTITY_UPDATE',
+            targetId: entity.id,
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: { name: newName }
+        });
     };
 
     const handleToggleLock = (e: React.MouseEvent) => {
@@ -45,6 +57,16 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
 
         const newLockedState = !isLocalLocked;
         updateEntity(entity.id, { isLocked: newLockedState });
+
+        // Locking operations are handled by useEntityLock for socket emit, 
+        // but we sync the property 'isLocked' as well for persistence
+        sendOperation({
+            type: 'ENTITY_UPDATE',
+            targetId: entity.id,
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: { isLocked: newLockedState }
+        });
 
         if (!newLockedState) {
             requestLock();
@@ -65,8 +87,17 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
             isFK: false,
             isNullable: true,
         };
+        const newAttributes = [...entity.attributes, newAttr];
         updateEntity(entity.id, {
-            attributes: [...entity.attributes, newAttr],
+            attributes: newAttributes,
+        });
+
+        sendOperation({
+            type: 'ATTRIBUTE_ADD',
+            targetId: entity.id,
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: { attributes: newAttributes } // Send FULL attributes list as per SyncEngine
         });
     };
 
@@ -77,6 +108,14 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
             attr.id === attrId ? { ...attr, ...updates } : attr
         );
         updateEntity(entity.id, { attributes: newAttributes });
+
+        sendOperation({
+            type: 'ATTRIBUTE_UPDATE',
+            targetId: entity.id,
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: { attributes: newAttributes }
+        });
     };
 
     const handleDeleteAttribute = (e: React.MouseEvent, attrId: string) => {
@@ -84,18 +123,34 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
         if (isLocked) return;
         const newAttributes = entity.attributes.filter((attr) => attr.id !== attrId);
         updateEntity(entity.id, { attributes: newAttributes });
+
+        sendOperation({
+            type: 'ATTRIBUTE_DELETE',
+            targetId: entity.id,
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: { attributes: newAttributes }
+        });
     };
 
     const handleDeleteEntity = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (window.confirm(`Delete entity "${entity.name}"?`)) {
             deleteEntity(entity.id);
+
+            sendOperation({
+                type: 'ENTITY_DELETE',
+                targetId: entity.id,
+                userId: user?.id || 'anonymous',
+                userName: user?.name || 'Anonymous',
+                payload: {}
+            });
         }
     };
 
     return (
         <div
-            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group relative overflow-hidden ${selected
+            className={`bg-white rounded-lg shadow-xl border-2 transition-all min-w-[300px] group relative ${selected
                 ? 'border-orange-500 shadow-orange-200 shadow-lg ring-2 ring-orange-300 ring-offset-2'
                 : isLocked
                     ? 'border-gray-200 shadow-sm'
@@ -108,7 +163,7 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
             {isLocalLocked && (
                 <div
                     onDoubleClick={handleToggleLock}
-                    className="absolute inset-0 z-[100] flex items-center justify-center cursor-pointer group/mask hover:bg-white/30 transition-all duration-300"
+                    className="absolute inset-0 z-[100] flex items-center justify-center cursor-pointer group/mask hover:bg-white/30 transition-all duration-300 rounded-[inherit]"
                     title={isLockedByOther ? `Locked by ${lockedBy}` : "더블 클릭하여 잠금 해제"}
                 >
                     <div className="bg-white/90 p-3 rounded-full shadow-lg border border-gray-100 opacity-0 group-hover/mask:opacity-100 transition-all transform scale-90 group-hover/mask:scale-100 flex flex-col items-center gap-1">
@@ -121,7 +176,7 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
             )}
 
             {/* Header */}
-            <div className={`px-4 py-2 flex items-center gap-2 text-white ${isLocked ? 'bg-gray-400' : 'bg-gradient-to-r from-blue-500 to-blue-600'}`}>
+            <div className={`px-4 py-2 flex items-center gap-2 text-white rounded-t-[calc(0.5rem-2px)] ${isLocked ? 'bg-gray-400' : 'bg-gradient-to-r from-blue-500 to-blue-600'}`}>
                 <Database size={16} className="flex-shrink-0" />
                 <input
                     type="text"
@@ -174,7 +229,7 @@ const EntityNode: React.FC<NodeProps<EntityNodeData>> = ({ data, selected }) => 
             )}
 
             {/* Attributes */}
-            <div className="p-2 space-y-1">
+            <div className="p-2 space-y-1 rounded-b-[calc(0.5rem-2px)]">
                 {entity.attributes.map((attr) => (
                     <div
                         key={attr.id}
