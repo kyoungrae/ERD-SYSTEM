@@ -103,6 +103,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
         console.log('🔌 Creating new socket connection...');
         const socket = io(SOCKET_URL, {
+            path: import.meta.env.VITE_SOCKET_PATH || '/socket.io',
             autoConnect: true,
             reconnection: true,
             reconnectionAttempts: 5,

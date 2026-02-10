@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Project, DBType, ProjectMember } from '../types/erd';
 
-const API_URL = 'http://localhost:3001/api/projects';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/projects';
 
 interface ProjectStore {
     projects: Project[];
