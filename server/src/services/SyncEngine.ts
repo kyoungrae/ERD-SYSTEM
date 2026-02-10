@@ -128,7 +128,43 @@ export class SyncEngine {
             case 'RELATIONSHIP_DELETE':
                 newState.relationships = state.relationships.filter(r => r.id !== operation.targetId);
                 break;
+
+            case 'ERD_IMPORT':
+                const importPayload = operation.payload as any;
+                if (importPayload.overwrite) {
+                    newState.entities = importPayload.entities || [];
+                    newState.relationships = importPayload.relationships || [];
+                } else {
+                    // Merge logic (roughly similar to frontend mergeData)
+                    const importedEntities = importPayload.entities || [];
+                    const importedRelationships = importPayload.relationships || [];
+
+                    // Add new entities, avoid duplicates by name
+                    const currentEntities = [...state.entities];
+                    importedEntities.forEach((newE: any) => {
+                        if (!currentEntities.some(e => e.name.toLowerCase() === newE.name.toLowerCase())) {
+                            currentEntities.push(newE);
+                        }
+                    });
+                    newState.entities = currentEntities;
+
+                    // Add new relationships
+                    const currentRelationships = [...state.relationships];
+                    importedRelationships.forEach((newR: any) => {
+                        if (!currentRelationships.some(r => r.id === newR.id)) {
+                            currentRelationships.push(newR);
+                        }
+                    });
+                    newState.relationships = currentRelationships;
+                }
+                break;
         }
+
+        // Integrity Check: Remove orphan relationships (relationships pointing to non-existent entities)
+        const entityIds = new Set(newState.entities.map(e => e.id));
+        newState.relationships = newState.relationships.filter(
+            r => entityIds.has(r.source) && entityIds.has(r.target)
+        );
 
         return newState;
     }

@@ -8,6 +8,7 @@ import { redis } from './config/redis';
 import { initializeSocketServer } from './websocket/SocketServer';
 import authRoutes from './routes/authRoutes';
 import projectRoutes from './routes/projectRoutes';
+import logger from './utils/logger';
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,6 +36,12 @@ app.use(cors({
     credentials: true,
 }));
 app.use(express.json());
+
+// Request Logging Middleware
+app.use((req, res, next) => {
+    logger.info(`${req.method} ${req.url}`);
+    next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -68,11 +75,11 @@ async function start() {
 
         // Test Redis connection
         await redis.ping();
-        console.log('✅ Redis ping successful');
+        logger.info('✅ Redis ping successful');
 
         // Start HTTP server
         httpServer.listen(config.port, () => {
-            console.log(`
+            logger.info(`
 🚀 ERD System Server is running!
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📡 HTTP:      http://localhost:${config.port}
@@ -83,7 +90,7 @@ async function start() {
       `);
         });
     } catch (error) {
-        console.error('❌ Server startup error:', error);
+        logger.error('❌ Server startup error: %o', error);
         process.exit(1);
     }
 }

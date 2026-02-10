@@ -3,6 +3,7 @@ import { X, Download, Code, Check } from 'lucide-react';
 import { useERDStore } from '../store/erdStore';
 import { useSyncStore } from '../store/syncStore';
 import { useAuthStore } from '../store/authStore';
+import { useProjectStore } from '../store/projectStore';
 import { parseSQLToERD } from '../utils/sqlParser';
 
 interface ImportModalProps {
@@ -10,9 +11,10 @@ interface ImportModalProps {
 }
 
 const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
-    const { entities, mergeData } = useERDStore();
+    const { entities, mergeData, addLog } = useERDStore();
     const { sendOperation } = useSyncStore();
     const { user } = useAuthStore();
+    const { currentProjectId, updateProjectData } = useProjectStore();
     const [tab, setTab] = useState<'file' | 'code'>('file');
     const [sqlCode, setSqlCode] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
         return duplicates.map((d: any) => d.name);
     };
 
-    const processImport = (data: any) => {
+    const processImport = (data: any, importType: 'JSON' | 'SQL') => {
         const duplicateNames = checkDuplicates(data);
         let overwrite = false;
 
@@ -36,28 +38,40 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
             mergeData(data, false);
         }
 
-        // Broadcast the imported data to others
-        // We send operations for all entities and relationships in the imported data
-        // Other clients will ignore if ID already exists due to our erdStore safety checks
-        data.entities.forEach((entity: any) => {
-            sendOperation({
-                type: 'ENTITY_CREATE',
-                targetId: entity.id,
-                userId: user?.id || 'anonymous',
-                userName: user?.name || 'Anonymous',
-                payload: entity as unknown as Record<string, unknown>
-            });
+        // Add history log & broadcast
+        const logData = {
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            userPicture: user?.picture,
+            type: 'IMPORT' as const,
+            targetType: 'PROJECT' as const,
+            targetName: 'Project',
+            details: `${importType === 'SQL' ? 'SQL 스크립트' : 'JSON 파일'}에서 ${data.entities.length}개의 테이블을 가져왔습니다.`
+        };
+
+        addLog(logData);
+
+        // Broadcast the imported data as a single atomic operation
+        sendOperation({
+            type: 'ERD_IMPORT',
+            targetId: currentProjectId || 'project',
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'Anonymous',
+            payload: {
+                ...data,
+                overwrite,
+                historyLog: logData // Pass the log for others to add
+            }
         });
 
-        data.relationships.forEach((rel: any) => {
-            sendOperation({
-                type: 'RELATIONSHIP_CREATE',
-                targetId: rel.id,
-                userId: user?.id || 'anonymous',
-                userName: user?.name || 'Anonymous',
-                payload: rel as unknown as Record<string, unknown>
+        // Force a project save if we have a real project ID
+        if (currentProjectId && !currentProjectId.startsWith('proj_')) {
+            const { entities, relationships } = useERDStore.getState();
+            updateProjectData(currentProjectId, {
+                entities,
+                relationships,
             });
-        });
+        }
 
         onClose();
     };
@@ -69,7 +83,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target?.result as string);
-                    processImport(data);
+                    processImport(data, 'JSON');
                 } catch (err) {
                     setError('Failed to parse JSON file. Please check the format.');
                 }
@@ -90,7 +104,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
                 setError('No valid CREATE TABLE statements found.');
                 return;
             }
-            processImport(data);
+            processImport(data, 'SQL');
         } catch (err) {
             setError('Failed to parse SQL. Please check your syntax.');
         }

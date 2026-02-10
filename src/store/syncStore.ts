@@ -48,15 +48,14 @@ interface SyncStore {
     // Connection state
     socket: Socket | null;
     isConnected: boolean;
+    isAuthenticatedOnSocket: boolean; // New state
     currentProjectId: string | null;
 
     // Online users
     onlineUsers: OnlineUser[];
 
-    // Cursors (other users)
-    cursors: Map<string, CursorInfo>;
-
-    // Entity locks
+    // Cursors (other sessions)
+    cursors: Map<string, CursorInfo & { userId: string; clientId: string; userName: string; userPicture?: string }>; // clientId -> cursor
     locks: Map<string, LockInfo>;
 
     // Lamport clock
@@ -76,8 +75,8 @@ interface SyncStore {
 
     // Internal setters
     _setOnlineUsers: (users: OnlineUser[]) => void;
-    _setCursor: (userId: string, cursor: CursorInfo) => void;
-    _removeCursor: (userId: string) => void;
+    _setCursor: (clientId: string, cursor: any) => void;
+    _removeCursor: (clientId: string) => void;
     _setLock: (entityId: string, lock: LockInfo) => void;
     _removeLock: (entityId: string) => void;
     _incrementClock: () => number;
@@ -86,6 +85,7 @@ interface SyncStore {
 export const useSyncStore = create<SyncStore>((set, get) => ({
     socket: null,
     isConnected: false,
+    isAuthenticatedOnSocket: false,
     currentProjectId: null,
     onlineUsers: [],
     cursors: new Map(),
@@ -93,9 +93,13 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     lamportClock: 0,
 
     connect: () => {
-        const existingSocket = get().socket;
-        if (existingSocket?.connected) return;
+        const { socket: existingSocket } = get();
+        if (existingSocket) {
+            console.log('🔌 Socket already exists, skipping connect');
+            return;
+        }
 
+        console.log('🔌 Creating new socket connection...');
         const socket = io(SOCKET_URL, {
             autoConnect: true,
             reconnection: true,
@@ -103,14 +107,30 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             reconnectionDelay: 1000,
         });
 
+        // Set socket immediately so multiple calls don't spawn multiple connections
+        set({ socket });
+
         socket.on('connect', () => {
             console.log('🔌 Connected to collaboration server');
             set({ isConnected: true });
         });
 
+        socket.on('authenticated', (data: { success: boolean }) => {
+            if (data.success) {
+                console.log('✅ Identity confirmed by server');
+                set({ isAuthenticatedOnSocket: true });
+            }
+        });
+
         socket.on('disconnect', () => {
             console.log('🔌 Disconnected from collaboration server');
-            set({ isConnected: false, onlineUsers: [], cursors: new Map(), locks: new Map() });
+            set({
+                isConnected: false,
+                isAuthenticatedOnSocket: false,
+                onlineUsers: [],
+                cursors: new Map(),
+                locks: new Map()
+            });
         });
 
         socket.on('connect_error', (error) => {
@@ -160,8 +180,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         });
 
         // Cursor updates
-        socket.on('cursor_update', (cursor: CursorInfo) => {
-            get()._setCursor(cursor.userId, cursor);
+        socket.on('cursor_update', (data: any) => {
+            get()._setCursor(data.clientId, data);
         });
 
         // Lock events
@@ -177,8 +197,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         socket.on('lock_released', (data: { entityId: string }) => {
             get()._removeLock(data.entityId);
         });
-
-        set({ socket });
     },
 
     disconnect: () => {
@@ -268,15 +286,15 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
     _setOnlineUsers: (users) => set({ onlineUsers: users }),
 
-    _setCursor: (userId, cursor) => {
+    _setCursor: (clientId, cursor) => {
         const cursors = new Map(get().cursors);
-        cursors.set(userId, cursor);
+        cursors.set(clientId, cursor);
         set({ cursors });
     },
 
-    _removeCursor: (userId) => {
+    _removeCursor: (clientId) => {
         const cursors = new Map(get().cursors);
-        cursors.delete(userId);
+        cursors.delete(clientId);
         set({ cursors });
     },
 

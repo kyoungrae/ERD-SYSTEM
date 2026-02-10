@@ -260,12 +260,18 @@ export const useERDStore = create<ERDStore>((set, get) => {
         },
 
         importData: (data) =>
-            set((state) => ({
-                ...pushHistory(state),
-                entities: data.entities,
-                relationships: data.relationships,
-                history: data.history || state.history,
-            })),
+            set((state) => {
+                const cleanedRelationships = (data.relationships || []).filter(r =>
+                    data.entities.some((e: any) => e.id === r.source) &&
+                    data.entities.some((e: any) => e.id === r.target)
+                );
+                return {
+                    ...pushHistory(state),
+                    entities: data.entities,
+                    relationships: cleanedRelationships,
+                    history: data.history || state.history,
+                };
+            }),
 
         addLog: (logData) =>
             set((state) => ({
@@ -316,10 +322,16 @@ export const useERDStore = create<ERDStore>((set, get) => {
                     }
                 });
 
+                const finalEntities = newEntities;
+                const finalRelationships = newRelationships.filter(r =>
+                    finalEntities.some(e => e.id === r.source) &&
+                    finalEntities.some(e => e.id === r.target)
+                );
+
                 return {
                     ...history,
-                    entities: newEntities,
-                    relationships: newRelationships,
+                    entities: finalEntities,
+                    relationships: finalRelationships,
                 };
             }),
     };

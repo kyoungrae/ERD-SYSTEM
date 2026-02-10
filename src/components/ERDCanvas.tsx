@@ -68,6 +68,8 @@ const ERDCanvasContent: React.FC = () => {
         deleteRelationship,
         exportData,
         importData,
+        mergeData,
+        addLog,
         undo,
         redo,
         canUndo,
@@ -88,7 +90,7 @@ const ERDCanvasContent: React.FC = () => {
     const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
     const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
     const flowWrapper = React.useRef<HTMLDivElement>(null);
-    const { getViewport, screenToFlowPosition } = useReactFlow();
+    const { getViewport, screenToFlowPosition, getNodes } = useReactFlow();
 
     // Collaboration Store
     const { updateCursor, sendOperation } = useSyncStore();
@@ -113,6 +115,9 @@ const ERDCanvasContent: React.FC = () => {
             const op = e.detail;
             if (!op) return;
 
+            // Skip if this is our own operation echoed back from the server
+            if (user && op.userId === user.id) return;
+
             const remoteUser: any = {
                 id: op.userId || 'remote',
                 name: op.userName || 'Remote User',
@@ -121,6 +126,9 @@ const ERDCanvasContent: React.FC = () => {
             };
 
             switch (op.type) {
+                case 'IMPORT':
+                    addLog(op.payload);
+                    break;
                 case 'ENTITY_CREATE':
                     addEntity(op.payload, remoteUser);
                     break;
@@ -148,12 +156,18 @@ const ERDCanvasContent: React.FC = () => {
                 case 'RELATIONSHIP_DELETE':
                     deleteRelationship(op.targetId, remoteUser);
                     break;
+                case 'ERD_IMPORT':
+                    if (op.payload.historyLog) {
+                        addLog(op.payload.historyLog);
+                    }
+                    mergeData(op.payload, op.payload.overwrite);
+                    break;
             }
         };
 
         window.addEventListener('erd:remote_operation', handleRemoteOperation as EventListener);
         return () => window.removeEventListener('erd:remote_operation', handleRemoteOperation as EventListener);
-    }, [addEntity, updateEntity, deleteEntity, addRelationship, updateRelationship, deleteRelationship]);
+    }, [addEntity, updateEntity, deleteEntity, addRelationship, updateRelationship, deleteRelationship, user, addLog, mergeData]);
 
     // Handle state sync (initial load from server)
     useEffect(() => {
@@ -243,10 +257,39 @@ const ERDCanvasContent: React.FC = () => {
         });
     }, [entities, setNodes]);
 
-    // Keyboard shortcuts for Undo/Redo
+    // Keyboard shortcuts for Undo/Redo and Deletion
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const isMod = e.metaKey || e.ctrlKey;
+
+            // Delete selected entities on Escape, Backspace, or Delete with confirmation
+            if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Delete') {
+                // Ignore if typing in an input/textarea
+                const target = e.target as HTMLElement;
+                if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+                const selectedNodes = getNodes().filter(n => n.selected && n.type === 'entity');
+                if (selectedNodes.length > 0) {
+                    e.preventDefault(); // Prevent browser back navigation on backspace
+                    const confirmMsg = selectedNodes.length === 1
+                        ? `'${selectedNodes[0].data.entity.name}' 테이블을 삭제하시겠습니까?`
+                        : `${selectedNodes.length}개의 테이블을 삭제하시겠습니까?`;
+
+                    if (window.confirm(confirmMsg)) {
+                        selectedNodes.forEach(node => {
+                            deleteEntity(node.id, user);
+                            sendOperation({
+                                type: 'ENTITY_DELETE',
+                                targetId: node.id,
+                                userId: user?.id || 'anonymous',
+                                userName: user?.name || 'Anonymous',
+                                payload: {}
+                            });
+                        });
+                    }
+                }
+                return;
+            }
 
             if (isMod && e.key === 'z') {
                 if (e.shiftKey) {
@@ -267,7 +310,7 @@ const ERDCanvasContent: React.FC = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [undo, redo]);
+    }, [undo, redo, deleteEntity, sendOperation, user, getNodes]);
 
     // Convert relationships to ReactFlow edges
     useEffect(() => {
@@ -859,6 +902,7 @@ const ERDCanvasContent: React.FC = () => {
                     fitView
                     multiSelectionKeyCode="Shift"
                     selectionKeyCode="Shift"
+                    deleteKeyCode={null}
                     onPaneMouseMove={onPaneMouseMove}
                 >
                     <UserCursorsLayer />

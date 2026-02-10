@@ -89,3 +89,45 @@ export const deleteProject = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ message: '프로젝트 삭제 중 오류가 발생했습니다.' });
     }
 };
+export const updateProject = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { name, description, data } = req.body;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ message: '사용자 인증이 필요합니다.' });
+        }
+
+        const project = await Project.findOne({
+            _id: id,
+            'members.userId': new Types.ObjectId(userId)
+        });
+
+        if (!project) {
+            return res.status(404).json({ message: '프로젝트를 찾을 수 없거나 수정 권한이 없습니다.' });
+        }
+
+        // Check if member is OWNER or EDITOR
+        const member = project.members.find(m => m.userId.toString() === userId);
+        if (member?.role === 'VIEWER') {
+            return res.status(403).json({ message: '수정 권한이 없습니다.' });
+        }
+
+        if (name) project.name = name;
+        if (description !== undefined) project.description = description;
+        if (data) {
+            project.currentSnapshot = {
+                ...data,
+                version: (project.currentSnapshot?.version || 0) + 1,
+                savedAt: new Date()
+            };
+        }
+
+        await project.save();
+        res.json(project);
+    } catch (error) {
+        console.error('Update project error:', error);
+        res.status(500).json({ message: '프로젝트 수정 중 오류가 발생했습니다.' });
+    }
+};

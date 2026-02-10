@@ -50,8 +50,27 @@ export function initializeSocketServer(httpServer: HTTPServer): SocketIOServer {
 
         // Authenticate user
         socket.on('authenticate', async (userData: UserInfo) => {
+            const oldUserId = socketData.user.id;
             socketData.user = userData;
             console.log(`✅ User authenticated: ${userData.name}`);
+
+            // If already in a project, update the presence with new identity
+            if (socketData.projectId) {
+                const onlineUsers = await presenceManager.userJoin(
+                    socketData.projectId,
+                    socket.id, // Use socket.id as key
+                    userData.id,
+                    userData.name,
+                    userData.picture
+                );
+
+                // Notify others of identity update
+                io.to(`project:${socketData.projectId}`).emit('user_joined', {
+                    user: userData,
+                    onlineUsers,
+                });
+            }
+
             socket.emit('authenticated', { success: true });
         });
 
@@ -73,10 +92,13 @@ export function initializeSocketServer(httpServer: HTTPServer): SocketIOServer {
             // Add to online users
             const onlineUsers = await presenceManager.userJoin(
                 projectId,
+                socket.id, // clientId
                 socketData.user.id,
                 socketData.user.name,
                 socketData.user.picture
             );
+
+            // ... (rest of join logic)
 
             // Get current state
             let state = await projectStateManager.getState(projectId);
@@ -172,11 +194,12 @@ export function initializeSocketServer(httpServer: HTTPServer): SocketIOServer {
         socket.on('cursor_move', async (data: { x: number; y: number; viewport?: { x: number; y: number; zoom: number } }) => {
             if (!socketData.projectId) return;
 
-            await presenceManager.updateCursor(socketData.projectId, socketData.user.id, data);
+            await presenceManager.updateCursor(socketData.projectId, socketData.user.id, socket.id, data);
 
             // Broadcast to others
             socket.to(`project:${socketData.projectId}`).emit('cursor_update', {
                 userId: socketData.user.id,
+                clientId: socket.id, // Support multi-tab sessions
                 userName: socketData.user.name,
                 userPicture: socketData.user.picture,
                 ...data,
@@ -233,10 +256,10 @@ export function initializeSocketServer(httpServer: HTTPServer): SocketIOServer {
             console.log(`🔌 Client disconnected: ${socket.id}`);
 
             if (socketData.projectId) {
-                // Remove from online users
+                // Remove from online users using socket.id
                 const onlineUsers = await presenceManager.userLeave(
                     socketData.projectId,
-                    socketData.user.id
+                    socket.id
                 );
 
                 // Release all locks held by this user

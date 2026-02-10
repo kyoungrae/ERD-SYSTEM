@@ -5,6 +5,11 @@ export function OnlineUsers() {
     const onlineUsers = useSyncStore((state) => state.onlineUsers);
     const isConnected = useSyncStore((state) => state.isConnected);
 
+    // Group by unique user ID for display
+    const uniqueUsers = Array.from(
+        new Map(onlineUsers.map((u) => [u.id, u])).values()
+    );
+
     if (!isConnected) {
         return (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 rounded-full">
@@ -24,23 +29,25 @@ export function OnlineUsers() {
 
             {/* Online users avatars */}
             <div className="flex -space-x-2">
-                {onlineUsers.slice(0, 5).map((user, index) => (
+                {uniqueUsers.slice(0, 5).map((user, index) => (
                     <UserAvatar key={user.id} user={user} index={index} />
                 ))}
-                {onlineUsers.length > 5 && (
+                {uniqueUsers.length > 5 && (
                     <div
                         className="w-8 h-8 rounded-full bg-zinc-700 border-2 border-zinc-800 flex items-center justify-center"
-                        title={`+${onlineUsers.length - 5} more`}
+                        title={`+${uniqueUsers.length - 5} more`}
                     >
-                        <span className="text-xs text-zinc-300">+{onlineUsers.length - 5}</span>
+                        <span className="text-xs text-zinc-300">+{uniqueUsers.length - 5}</span>
                     </div>
                 )}
             </div>
 
             {/* User count */}
-            {onlineUsers.length > 0 && (
+            {uniqueUsers.length > 0 && (
                 <span className="text-xs text-zinc-400">
-                    {onlineUsers.length} online
+                    {uniqueUsers.length} person{uniqueUsers.length > 1 ? 's' : ''}
+                    {onlineUsers.length > uniqueUsers.length &&
+                        ` (${onlineUsers.length} tabs)`}
                 </span>
             )}
         </div>

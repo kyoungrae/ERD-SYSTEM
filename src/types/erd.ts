@@ -48,7 +48,7 @@ export interface Project {
     data: ERDState;
 }
 
-export type ChangeType = 'CREATE' | 'UPDATE' | 'DELETE' | 'PROJECT_SET';
+export type ChangeType = 'CREATE' | 'UPDATE' | 'DELETE' | 'PROJECT_SET' | 'IMPORT';
 
 export interface HistoryLog {
     id: string;

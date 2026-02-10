@@ -11,7 +11,8 @@ export type OperationType =
     | 'ATTRIBUTE_DELETE'
     | 'RELATIONSHIP_CREATE'
     | 'RELATIONSHIP_UPDATE'
-    | 'RELATIONSHIP_DELETE';
+    | 'RELATIONSHIP_DELETE'
+    | 'ERD_IMPORT';
 
 // History Document Interface
 export interface IHistory extends Document {
@@ -47,7 +48,8 @@ const HistorySchema = new Schema<IHistory>({
         enum: [
             'ENTITY_CREATE', 'ENTITY_UPDATE', 'ENTITY_DELETE', 'ENTITY_MOVE',
             'ATTRIBUTE_ADD', 'ATTRIBUTE_UPDATE', 'ATTRIBUTE_DELETE',
-            'RELATIONSHIP_CREATE', 'RELATIONSHIP_UPDATE', 'RELATIONSHIP_DELETE'
+            'RELATIONSHIP_CREATE', 'RELATIONSHIP_UPDATE', 'RELATIONSHIP_DELETE',
+            'ERD_IMPORT'
         ],
         required: true
     },

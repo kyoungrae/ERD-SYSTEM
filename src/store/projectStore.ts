@@ -136,12 +136,34 @@ export const useProjectStore = create<ProjectStore>()(
 
             setCurrentProject: (id) => set({ currentProjectId: id }),
 
-            updateProjectData: (id, data) =>
+            updateProjectData: async (id, data) => {
+                const token = localStorage.getItem('auth-token');
+                if (!token) return;
+
+                // Update local state immediately for responsiveness
                 set((state) => ({
                     projects: state.projects.map((p) =>
                         p.id === id ? { ...p, data, updatedAt: new Date().toISOString() } : p
                     ),
-                })),
+                }));
+
+                try {
+                    const response = await fetch(`${API_URL}/${id}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ data }),
+                    });
+
+                    if (!response.ok) {
+                        console.error('Failed to sync project data to server');
+                    }
+                } catch (error) {
+                    console.error('Update project data error:', error);
+                }
+            },
 
             updateProjectMembers: (id, members) =>
                 set((state) => ({
