@@ -491,48 +491,7 @@ const ProjectListPage: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Team Members Section */}
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">팀원 추가</label>
-                                <div className="flex gap-2 mb-3">
-                                    <div className="relative flex-1">
-                                        <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
-                                            type="text"
-                                            value={memberInput}
-                                            onChange={(e) => setMemberInput(e.target.value)}
-                                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddMember())}
-                                            placeholder="초대할 팀원의 이메일을 입력하세요"
-                                            className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium text-sm"
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleAddMember(false)}
-                                        className="px-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all active:scale-95 flex items-center gap-2"
-                                    >
-                                        <UserPlus size={18} />
-                                        추가
-                                    </button>
-                                </div>
 
-                                {newProjectMembers.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100 min-h-[50px]">
-                                        {newProjectMembers.map((member) => (
-                                            <div key={member.id} className="flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white border border-gray-200 rounded-full shadow-sm animate-in fade-in zoom-in duration-200">
-                                                <span className="text-xs font-bold text-gray-700">{member.name}</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveMember(member.id, false)}
-                                                    className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                                                >
-                                                    <X size={12} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
 
                             {createError && (
                                 <div className="p-3 bg-red-50 text-red-500 text-xs rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-1">
