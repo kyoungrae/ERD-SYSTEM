@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FolderOpen, Trash2, Clock, ChevronRight, LogOut, Database, Users, UserPlus, UserMinus, X, Share2 } from 'lucide-react';
+import { Plus, FolderOpen, Trash2, Clock, ChevronRight, LogOut, Database, Users, UserPlus, UserMinus, X, Share2, AlertTriangle } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useAuthStore } from '../store/authStore';
 import { type DBType, type ProjectMember } from '../types/erd';
@@ -218,6 +218,18 @@ const ProjectListPage: React.FC = () => {
                 </div>
             </header>
 
+            {/* Guest Warning Banner */}
+            {!localStorage.getItem('auth-token') && (
+                <div className="bg-amber-50 border-b border-amber-100 py-3">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-3 text-amber-700">
+                        <AlertTriangle size={18} className="flex-shrink-0" />
+                        <div className="text-sm font-bold leading-tight">
+                            참고: 현재 게스트 모드로 사용 중입니다. 프로젝트는 언제든지 삭제될 수 있으며 실시간 협업이 제한됩니다. 중요한 작업은 <button onClick={logout} className="underline hover:text-amber-900 transition-colors">로그인</button> 후 공식 프로젝트로 관리해 주세요.
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10">
                 {/* Dashboard Controls */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
@@ -267,8 +279,9 @@ const ProjectListPage: React.FC = () => {
                                 className="group bg-white rounded-[28px] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 transition-all cursor-pointer flex flex-col h-full ring-0 hover:ring-2 ring-blue-500/20"
                             >
                                 {(() => {
+                                    const isLocal = project.id.startsWith('local_');
                                     const projectOwner = project.members?.find((m) => m.role === 'OWNER');
-                                    const isOwner = user?.id === projectOwner?.id;
+                                    const isOwner = isLocal || user?.id === projectOwner?.id;
                                     return (
                                         <>
                                             <div className="flex items-start justify-between mb-6">
@@ -276,25 +289,32 @@ const ProjectListPage: React.FC = () => {
                                                     <div className="p-3 bg-gray-50 text-blue-500 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
                                                         <Database size={24} />
                                                     </div>
-                                                    <div className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                                                        {project.dbType}
+                                                    <div className="flex flex-col gap-1">
+                                                        {isLocal && (
+                                                            <div className="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-[8px] font-black uppercase tracking-wider border border-amber-100 flex items-center justify-center gap-1">
+                                                                Local
+                                                            </div>
+                                                        )}
+                                                        <div className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                                            {project.dbType}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {/* Team Management - Only Owner */}
-                                                    {/* Team / Participant List Button */}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingMembersProject(project.id);
-                                                            setTempMembers(project.members || []);
-                                                            setMemberInput('');
-                                                        }}
-                                                        className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                                                        title={isOwner ? "팀원 관리" : "참여자 목록"}
-                                                    >
-                                                        {isOwner ? <Users size={18} /> : <Users size={18} />}
-                                                    </button>
+                                                    {!isLocal && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingMembersProject(project.id);
+                                                                setTempMembers(project.members || []);
+                                                                setMemberInput('');
+                                                            }}
+                                                            className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                                            title={isOwner ? "팀원 관리" : "참여자 목록"}
+                                                        >
+                                                            {isOwner ? <Users size={18} /> : <Users size={18} />}
+                                                        </button>
+                                                    )}
 
                                                     {/* Delete (Owner only) */}
                                                     {isOwner && (
@@ -424,6 +444,7 @@ const ProjectListPage: React.FC = () => {
                             </div>
 
                             <button
+                                disabled={!localStorage.getItem('auth-token')}
                                 onClick={async () => {
                                     if (joinCode.trim()) {
                                         await handleJoinProject(joinCode.trim());
@@ -431,10 +452,10 @@ const ProjectListPage: React.FC = () => {
                                         setJoinCode('');
                                     }
                                 }}
-                                className="w-full py-4 px-6 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                className="w-full py-4 px-6 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:bg-gray-400"
                             >
                                 <Share2 size={18} />
-                                프로젝트 참여하기
+                                {!localStorage.getItem('auth-token') ? '로그인 후 참여 가능' : '프로젝트 참여하기'}
                             </button>
                         </div>
                     </div>

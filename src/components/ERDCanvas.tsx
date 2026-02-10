@@ -77,7 +77,7 @@ const ERDCanvasContent: React.FC = () => {
     } = useERDStore();
 
     const { user, logout } = useAuthStore();
-    const { projects, currentProjectId, setCurrentProject } = useProjectStore();
+    const { projects, currentProjectId, setCurrentProject, updateProjectData } = useProjectStore();
 
     const currentProject = projects.find(p => p.id === currentProjectId);
 
@@ -181,31 +181,25 @@ const ERDCanvasContent: React.FC = () => {
     }, [importData]);
 
 
-    // Initial load of project data into ERDStore -> DISABLED to avoid stale data flash
-    /*
+    // Initial load for local projects
     useEffect(() => {
-        if (currentProject) {
+        if (currentProjectId?.startsWith('local_') && currentProject) {
             importData(currentProject.data);
         }
-    }, [currentProjectId]); // Run when project changes
-    */
+    }, [currentProjectId]);
 
-
-
-    // Auto-save ERDStore changes to ProjectStore -> DISABLED (Using Socket.IO as Source of Truth)
-    /*
+    // Auto-save ERDStore changes to ProjectStore for LOCAL projects
     useEffect(() => {
-        if (currentProjectId) {
+        if (currentProjectId?.startsWith('local_')) {
             const timer = setTimeout(() => {
                 updateProjectData(currentProjectId, {
                     entities,
                     relationships,
                 });
-            }, 1000); // Debounce saves
+            }, 1000); // 1s debounce
             return () => clearTimeout(timer);
         }
     }, [entities, relationships, currentProjectId, updateProjectData]);
-    */
 
     useEffect(() => {
         setNodes((prevNodes) => {

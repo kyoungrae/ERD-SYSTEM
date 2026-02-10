@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { create } from 'zustand';
-import type { Entity, Relationship, ERDState, HistoryLog } from '../types/erd';
+import type { ERDState, HistoryLog } from '../types/erd';
 
 // Socket Server URL
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
@@ -227,6 +227,19 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     },
 
     joinProject: (projectId) => {
+        // Handle local project
+        if (projectId.startsWith('local_')) {
+            console.log('🏠 Joining local project (Guest Mode)');
+            set({
+                currentProjectId: projectId,
+                isSynced: true, // Local state is always "synced"
+                onlineUsers: [],
+                cursors: new Map(),
+                locks: new Map()
+            });
+            return;
+        }
+
         const { socket } = get();
         if (socket) {
             socket.emit('join_project', { projectId });
@@ -243,8 +256,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     },
 
     sendOperation: (operationData) => {
-        const { socket } = get();
-        if (socket) {
+        const { socket, currentProjectId } = get();
+        if (socket && currentProjectId && !currentProjectId.startsWith('local_')) {
             const operation: CRDTOperation = {
                 ...operationData,
                 id: `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -256,13 +269,16 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     },
 
     updateCursor: (position) => {
-        const { socket } = get();
-        if (socket) {
+        const { socket, currentProjectId } = get();
+        if (socket && currentProjectId && !currentProjectId.startsWith('local_')) {
             socket.emit('cursor_move', position);
         }
     },
 
     requestLock: async (entityId) => {
+        const { currentProjectId } = get();
+        if (currentProjectId?.startsWith('local_')) return true;
+
         return new Promise((resolve) => {
             const { socket } = get();
             if (!socket) {
@@ -290,8 +306,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     },
 
     releaseLock: (entityId) => {
-        const { socket } = get();
-        if (socket) {
+        const { socket, currentProjectId } = get();
+        if (socket && currentProjectId && !currentProjectId.startsWith('local_')) {
             socket.emit('release_lock', { entityId });
         }
     },

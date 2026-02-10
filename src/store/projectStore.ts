@@ -60,7 +60,24 @@ export const useProjectStore = create<ProjectStore>()(
 
             addProject: async (name, dbType, _members, description) => {
                 const token = localStorage.getItem('auth-token');
-                if (!token) throw new Error('Authentication required');
+
+                // Guest / Local Mode
+                if (!token) {
+                    const newProject: Project = {
+                        id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                        name,
+                        dbType,
+                        description: description || '',
+                        members: [],
+                        data: { entities: [], relationships: [] },
+                        updatedAt: new Date().toISOString()
+                    };
+
+                    set((state) => ({
+                        projects: [newProject, ...state.projects],
+                    }));
+                    return newProject;
+                }
 
                 try {
                     const response = await fetch(API_URL, {
@@ -145,8 +162,16 @@ export const useProjectStore = create<ProjectStore>()(
             },
 
             deleteProject: async (id) => {
-                const token = localStorage.getItem('auth-token');
+                // If it's a local project, just remove it
+                if (id.startsWith('local_')) {
+                    set((state) => ({
+                        projects: state.projects.filter((p) => p.id !== id),
+                        currentProjectId: state.currentProjectId === id ? null : state.currentProjectId,
+                    }));
+                    return;
+                }
 
+                const token = localStorage.getItem('auth-token');
                 // If token exists, try to delete from server
                 if (token) {
                     try {
@@ -161,9 +186,6 @@ export const useProjectStore = create<ProjectStore>()(
                         }
                     } catch (error) {
                         console.error('Delete project error:', error);
-                        // Optional: stop on network error? 
-                        // For better UX on "clearing local list", we might want to proceed even on error,
-                        // but skipping for safety.
                         return;
                     }
                 }
@@ -178,15 +200,16 @@ export const useProjectStore = create<ProjectStore>()(
             setCurrentProject: (id) => set({ currentProjectId: id }),
 
             updateProjectData: async (id, data) => {
-                const token = localStorage.getItem('auth-token');
-                if (!token) return;
-
                 // Update local state immediately for responsiveness
                 set((state) => ({
                     projects: state.projects.map((p) =>
                         p.id === id ? { ...p, data, updatedAt: new Date().toISOString() } : p
                     ),
                 }));
+
+                // Skip server sync for local projects or if no token
+                const token = localStorage.getItem('auth-token');
+                if (!token || id.startsWith('local_')) return;
 
                 try {
                     const response = await fetch(`${API_URL}/${id}`, {
