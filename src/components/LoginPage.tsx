@@ -5,7 +5,7 @@ import { useProjectStore } from '../store/projectStore';
 
 const LoginPage: React.FC = () => {
     const { login } = useAuthStore();
-    const { setCurrentProject, joinWithCode } = useProjectStore();
+    const { setCurrentProject } = useProjectStore();
     const [isSignup, setIsSignup] = useState(false);
     const [isCodeSent, setIsCodeSent] = useState(false);
     const [email, setEmail] = useState('');
@@ -117,14 +117,9 @@ const LoginPage: React.FC = () => {
             localStorage.setItem('auth-token', data.token);
             login(data.user, data.token);
 
-            // If there's an invitation code, try to join immediately
+            // If there's an invitation code, store it for ProjectListPage to handle
             if (invitationCode.trim()) {
-                try {
-                    await joinWithCode(invitationCode.trim());
-                } catch (inviteErr) {
-                    console.error('Auto-join failed:', inviteErr);
-                    // We don't block the login, just log it.
-                }
+                sessionStorage.setItem('pending-invite', invitationCode.trim());
             }
 
             setCurrentProject(null);

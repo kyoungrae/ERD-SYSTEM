@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FolderOpen, Trash2, Clock, ChevronRight, LogOut, Database, Users, UserPlus, X } from 'lucide-react';
+import { Plus, FolderOpen, Trash2, Clock, ChevronRight, LogOut, Database, Users, UserPlus, UserMinus, X, Share2 } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useAuthStore } from '../store/authStore';
 import { type DBType, type ProjectMember } from '../types/erd';
@@ -17,9 +17,19 @@ const ProjectListPage: React.FC = () => {
     const [memberInput, setMemberInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
+    const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+    const [joinCode, setJoinCode] = useState('');
 
     React.useEffect(() => {
         fetchProjects();
+
+        // Check for pending invitation from login redirect
+        const pendingInvite = sessionStorage.getItem('pending-invite');
+        if (pendingInvite) {
+            setJoinCode(pendingInvite);
+            setIsJoinModalOpen(true);
+            sessionStorage.removeItem('pending-invite');
+        }
     }, [fetchProjects]);
 
     const targetProject = projects.find(p => p.id === editingMembersProject);
@@ -81,11 +91,20 @@ const ProjectListPage: React.FC = () => {
         }
     };
 
-    const handleUpdateMembers = () => {
+    const handleUpdateMembers = async () => {
         if (editingMembersProject) {
-            updateProjectMembers(editingMembersProject, tempMembers);
-            setEditingMembersProject(null);
-            setMemberInput('');
+            try {
+                setIsLoading(true);
+                await updateProjectMembers(editingMembersProject, tempMembers);
+                setEditingMembersProject(null);
+                setMemberInput('');
+                alert('팀원 구성이 저장되었습니다.');
+                await fetchProjects();
+            } catch (err: any) {
+                alert(err.message || '저장에 실패했습니다.');
+            } finally {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -195,32 +214,13 @@ const ProjectListPage: React.FC = () => {
                         <p className="text-gray-500 font-medium">관리 중인 모든 ERD 다이어그램 리스트입니다.</p>
                     </div>
                     <div className="flex gap-3">
-                        <div className="relative flex items-center">
-                            <input
-                                type="text"
-                                placeholder="프로젝트 ID 입력"
-                                className="pl-4 pr-12 py-3.5 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm w-48 shadow-sm"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        const target = e.target as HTMLInputElement;
-                                        if (target.value.trim()) {
-                                            handleJoinProject(target.value.trim());
-                                        }
-                                    }
-                                }}
-                            />
-                            <button
-                                onClick={(e) => {
-                                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                                    if (input.value.trim()) {
-                                        handleJoinProject(input.value.trim());
-                                    }
-                                }}
-                                className="absolute right-2 p-1.5 bg-gray-100 text-gray-500 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                            >
-                                <ChevronRight size={18} />
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => setIsJoinModalOpen(true)}
+                            className="flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-2xl font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                        >
+                            <Share2 size={20} className="text-blue-500" />
+                            초대 코드로 참여
+                        </button>
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
                             className="flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95 whitespace-nowrap"
@@ -270,38 +270,37 @@ const ProjectListPage: React.FC = () => {
                                                 </div>
                                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {/* Team Management - Only Owner */}
+                                                    {/* Team / Participant List Button */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingMembersProject(project.id);
+                                                            setTempMembers(project.members || []);
+                                                            setMemberInput('');
+                                                        }}
+                                                        className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                                        title={isOwner ? "팀원 관리" : "참여자 목록"}
+                                                    >
+                                                        {isOwner ? <Users size={18} /> : <Users size={18} />}
+                                                    </button>
+
+                                                    {/* Delete (Owner only) */}
                                                     {isOwner && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setEditingMembersProject(project.id);
-                                                                setTempMembers(project.members || []);
-                                                                setMemberInput('');
+                                                                const message = `'${project.name}' 프로젝트를 영구적으로 삭제하시겠습니까? (복구 불가)`;
+
+                                                                if (window.confirm(message)) {
+                                                                    deleteProject(project.id);
+                                                                }
                                                             }}
-                                                            className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                                                            title="팀원 관리"
+                                                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                            title="프로젝트 삭제"
                                                         >
-                                                            <Users size={18} />
+                                                            <Trash2 size={18} />
                                                         </button>
                                                     )}
-
-                                                    {/* Delete (Owner) or Leave (Member) */}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const message = isOwner
-                                                                ? `'${project.name}' 프로젝트를 영구적으로 삭제하시겠습니까? (복구 불가)`
-                                                                : `'${project.name}' 프로젝트 목록에서 제거하시겠습니까? `;
-
-                                                            if (window.confirm(message)) {
-                                                                deleteProject(project.id);
-                                                            }
-                                                        }}
-                                                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                        title={isOwner ? "프로젝트 삭제" : "목록에서 제거"}
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
                                                 </div>
                                             </div>
 
@@ -379,6 +378,56 @@ const ProjectListPage: React.FC = () => {
                     </div>
                 )}
             </main>
+
+            {/* Join Project Modal */}
+            {isJoinModalOpen && (
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden scale-in">
+                        <div className="p-8 border-b border-gray-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-2xl font-black text-gray-900 mb-1">프로젝트 참여</h3>
+                                <p className="text-gray-500 font-medium text-sm">초대 코드 또는 프로젝트 ID를 입력하세요.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsJoinModalOpen(false)}
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="p-8 space-y-6">
+                            <div className="space-y-1.5">
+                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 ml-1">
+                                    <Database size={14} className="text-blue-500" />
+                                    초대 코드 / 프로젝트 ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={joinCode}
+                                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                                    placeholder="8자리 코드 또는 ID 입력"
+                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold tracking-wider text-center text-lg"
+                                />
+                            </div>
+
+                            <button
+                                onClick={async () => {
+                                    if (joinCode.trim()) {
+                                        await handleJoinProject(joinCode.trim());
+                                        setIsJoinModalOpen(false);
+                                        setJoinCode('');
+                                    }
+                                }}
+                                className="w-full py-4 px-6 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <Share2 size={18} />
+                                프로젝트 참여하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Create Project Modal */}
             {isCreateModalOpen && (
@@ -515,10 +564,21 @@ const ProjectListPage: React.FC = () => {
                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden scale-in">
                         <div className="p-8 border-b border-gray-100 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-2xl font-black text-gray-900 mb-1">팀원 관리</h3>
-                                <p className="text-gray-500 font-medium text-sm">'{targetProject.name}' 프로젝트의 협업자 목록</p>
-                            </div>
+                            {(() => {
+                                const isOwner = targetProject.members?.find(m => m.role === 'OWNER')?.id === user?.id;
+                                return (
+                                    <div>
+                                        <h3 className="text-2xl font-black text-gray-900 mb-1">
+                                            {isOwner ? '팀원 관리' : '참여자 목록'}
+                                        </h3>
+                                        <p className="text-gray-500 font-medium text-sm">
+                                            {isOwner
+                                                ? `'${targetProject.name}' 프로젝트의 협업자 목록 및 초대`
+                                                : `'${targetProject.name}' 프로젝트에 참여 중인 인원`}
+                                        </p>
+                                    </div>
+                                );
+                            })()}
                             <button
                                 onClick={() => setEditingMembersProject(null)}
                                 className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
@@ -532,72 +592,87 @@ const ProjectListPage: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">참여 중인 팀원</label>
                                 <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {tempMembers.map((member) => (
-                                        <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 hover:border-blue-200 transition-all">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
-                                                    {member.picture ? (
-                                                        <img src={member.picture} alt={member.name || 'User'} className="w-full h-full rounded-full object-cover" />
-                                                    ) : (
-                                                        (member.name || '?').charAt(0)
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                                                        {member.name || 'Unknown User'}
-                                                        {member.role === 'OWNER' && (
-                                                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded font-black tracking-tight">OWNER</span>
+                                    {(() => {
+                                        const isOwner = targetProject.members?.find(m => m.role === 'OWNER')?.id === user?.id;
+                                        return tempMembers.map((member) => (
+                                            <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 hover:border-blue-200 transition-all">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">
+                                                        {member.picture ? (
+                                                            <img src={member.picture} alt={member.name || 'User'} className="w-full h-full rounded-full object-cover" />
+                                                        ) : (
+                                                            (member.name || '?').charAt(0)
                                                         )}
                                                     </div>
-                                                    <div className="text-[10px] text-gray-400 font-medium">{member.email}</div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                                                            {member.name || 'Unknown User'}
+                                                            {member.role === 'OWNER' && (
+                                                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[10px] rounded font-black tracking-tight">OWNER</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-400 font-medium">{member.email}</div>
+                                                    </div>
                                                 </div>
+                                                {isOwner && member.role !== 'OWNER' && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm(`'${member.name}' 팀원을 프로젝트에서 제외하시겠습니까?`)) {
+                                                                handleRemoveMember(member.id, true);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="팀원에서 제외"
+                                                    >
+                                                        <UserMinus size={16} />
+                                                    </button>
+                                                )}
                                             </div>
-                                            {member.role !== 'OWNER' && (
+                                        ));
+                                    })()}
+                                </div>
+                            </div>
+
+                            {(() => {
+                                const isOwner = targetProject.members?.find(m => m.role === 'OWNER')?.id === user?.id;
+                                if (!isOwner) return null;
+                                return (
+                                    <>
+                                        {/* Add New Member */}
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">새 팀원 초대</label>
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1">
+                                                    <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        value={memberInput}
+                                                        onChange={(e) => setMemberInput(e.target.value)}
+                                                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddMember(true))}
+                                                        placeholder="초대할 팀원의 이메일을 입력하세요"
+                                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium text-sm"
+                                                    />
+                                                </div>
                                                 <button
-                                                    onClick={() => handleRemoveMember(member.id, true)}
-                                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                                                    title="방출"
+                                                    type="button"
+                                                    onClick={() => handleAddMember(true)}
+                                                    className="px-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all active:scale-95 flex items-center gap-2"
                                                 >
-                                                    <X size={16} />
+                                                    <UserPlus size={18} />
+                                                    초대
                                                 </button>
-                                            )}
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
 
-                            {/* Add New Member */}
-                            <div className="pt-4 border-t border-gray-100">
-                                <label className="block text-sm font-bold text-gray-700 mb-3 ml-1">새 팀원 초대</label>
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                        <input
-                                            type="text"
-                                            value={memberInput}
-                                            onChange={(e) => setMemberInput(e.target.value)}
-                                            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddMember(true))}
-                                            placeholder="초대할 팀원의 이메일을 입력하세요"
-                                            className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium text-sm"
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleAddMember(true)}
-                                        className="px-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all active:scale-95 flex items-center gap-2"
-                                    >
-                                        <UserPlus size={18} />
-                                        초대
-                                    </button>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleUpdateMembers}
-                                className="w-full py-4 px-6 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 mt-4"
-                            >
-                                저장하기
-                            </button>
+                                        <button
+                                            onClick={handleUpdateMembers}
+                                            className="w-full py-4 px-6 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 mt-4"
+                                        >
+                                            저장하기
+                                        </button>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

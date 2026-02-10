@@ -206,12 +206,35 @@ export const useProjectStore = create<ProjectStore>()(
                 }
             },
 
-            updateProjectMembers: (id, members) =>
+            updateProjectMembers: async (id, members) => {
+                const token = localStorage.getItem('auth-token');
+                if (token) {
+                    try {
+                        const response = await fetch(`${API_URL}/${id}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ members }),
+                        });
+
+                        if (!response.ok) {
+                            console.error('Failed to sync project members to server');
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Update project members error:', error);
+                        return;
+                    }
+                }
+
                 set((state) => ({
                     projects: state.projects.map((p) =>
                         p.id === id ? { ...p, members, updatedAt: new Date().toISOString() } : p
                     ),
-                })),
+                }));
+            },
 
             inviteMember: async (projectId, email) => {
                 const token = localStorage.getItem('auth-token');

@@ -127,6 +127,21 @@ export const updateProject = async (req: AuthRequest, res: Response) => {
             };
         }
 
+        // Only OWNER can modify members
+        if (req.body.members && member?.role === 'OWNER') {
+            const newMembers = req.body.members.map((m: any) => ({
+                userId: new Types.ObjectId(m.id),
+                role: m.role,
+                joinedAt: m.joinedAt || new Date()
+            }));
+
+            // Ensure owner remains
+            const hasOwner = newMembers.some((m: any) => m.role === 'OWNER');
+            if (hasOwner) {
+                project.members = newMembers;
+            }
+        }
+
         await project.save();
         res.json(project);
     } catch (error) {
