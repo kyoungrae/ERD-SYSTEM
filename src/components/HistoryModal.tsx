@@ -9,8 +9,19 @@ interface HistoryModalProps {
 
 const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose }) => {
     const { history } = useERDStore();
+    const [expandedLogs, setExpandedLogs] = React.useState<Set<string>>(new Set());
 
     if (!isOpen) return null;
+
+    const toggleExpand = (logId: string) => {
+        const newExpanded = new Set(expandedLogs);
+        if (newExpanded.has(logId)) {
+            newExpanded.delete(logId);
+        } else {
+            newExpanded.add(logId);
+        }
+        setExpandedLogs(newExpanded);
+    };
 
     const getIcon = (type: string, targetType: string) => {
         if (type === 'CREATE') return <Plus size={14} className="text-green-500" />;
@@ -112,7 +123,11 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose }) => {
 
                                 <div className="space-y-3">
                                     {groupedHistory[date].map((log) => (
-                                        <div key={log.id} className="group bg-white border border-gray-100 hover:border-blue-100 hover:shadow-md rounded-2xl p-4 transition-all duration-200">
+                                        <div
+                                            key={log.id}
+                                            onClick={() => log.type === 'IMPORT' && toggleExpand(log.id)}
+                                            className={`group bg-white border border-gray-100 hover:border-blue-100 hover:shadow-md rounded-2xl p-4 transition-all duration-200 ${log.type === 'IMPORT' ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+                                        >
                                             <div className="flex items-start gap-4">
                                                 {/* User Avatar */}
                                                 <div className="flex-shrink-0">
@@ -139,6 +154,11 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose }) => {
                                                             }`}>
                                                             {getIcon(log.type, log.targetType)}
                                                             {log.type}
+                                                            {log.type === 'IMPORT' && (
+                                                                <span className="ml-1 opacity-50">
+                                                                    {expandedLogs.has(log.id) ? '▲' : '▼'}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -165,6 +185,21 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose }) => {
                                                                 </span>
                                                             ))}
                                                         </p>
+
+                                                        {/* Expanded Tables List for IMPORT */}
+                                                        {log.type === 'IMPORT' && expandedLogs.has(log.id) && log.payload?.importedTables && (
+                                                            <div className="mt-3 pt-3 border-t border-gray-200/50 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">가져온 테이블 목록</p>
+                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                                                    {log.payload.importedTables.map((tableName: string, idx: number) => (
+                                                                        <div key={idx} className="flex items-center gap-2 bg-white/50 px-2 py-1.5 rounded-lg border border-gray-100">
+                                                                            <div className="w-1 h-1 bg-indigo-400 rounded-full" />
+                                                                            <span className="text-[11px] font-bold text-gray-700 truncate">{tableName}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { create } from 'zustand';
-import type { Entity, Relationship, ERDState } from '../types/erd';
+import type { Entity, Relationship, ERDState, HistoryLog } from '../types/erd';
 
 // Socket Server URL
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
@@ -48,7 +48,8 @@ interface SyncStore {
     // Connection state
     socket: Socket | null;
     isConnected: boolean;
-    isAuthenticatedOnSocket: boolean; // New state
+    isAuthenticatedOnSocket: boolean;
+    isSynced: boolean; // Track if initial state has been received from server
     currentProjectId: string | null;
 
     // Online users
@@ -86,6 +87,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     socket: null,
     isConnected: false,
     isAuthenticatedOnSocket: false,
+    isSynced: false,
     currentProjectId: null,
     onlineUsers: [],
     cursors: new Map(),
@@ -107,7 +109,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             reconnectionDelay: 1000,
         });
 
-        // Set socket immediately so multiple calls don't spawn multiple connections
+        // Set socket immediately
         set({ socket });
 
         socket.on('connect', () => {
@@ -127,6 +129,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             set({
                 isConnected: false,
                 isAuthenticatedOnSocket: false,
+                isSynced: false, // Reset sync state on disconnect
                 onlineUsers: [],
                 cursors: new Map(),
                 locks: new Map()
@@ -142,9 +145,13 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             state: ERDState & { version: number };
             onlineUsers: OnlineUser[];
             locks: Record<string, LockInfo>;
+            history: HistoryLog[];
         }) => {
-            console.log('📥 State synced from server');
-            set({ onlineUsers: data.onlineUsers });
+            console.log('📥 State synced from server (including history)');
+            set({
+                onlineUsers: data.onlineUsers,
+                isSynced: true // Mark as synced
+            });
 
             const locksMap = new Map<string, LockInfo>();
             Object.entries(data.locks).forEach(([entityId, lock]) => {
@@ -153,7 +160,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
             set({ locks: locksMap });
 
             // Dispatch custom event for ERD store to handle
-            window.dispatchEvent(new CustomEvent('erd:state_sync', { detail: data.state }));
+            window.dispatchEvent(new CustomEvent('erd:state_sync', {
+                detail: {
+                    ...data.state,
+                    history: data.history
+                }
+            }));
         });
 
         // User events

@@ -7,9 +7,29 @@ import { useSyncStore } from './store/syncStore';
 import { useEffect } from 'react';
 
 function App() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, logout } = useAuthStore();
   const { currentProjectId } = useProjectStore();
   const { isConnected, isAuthenticatedOnSocket, connect, disconnect, authenticate, joinProject, leaveProject } = useSyncStore();
+
+  // Guest Session Cleanup: Logout guest if browser was closed (sessionStorage cleared)
+  useEffect(() => {
+    const isSessionActive = sessionStorage.getItem('erd_session_active');
+
+    if (!isSessionActive) {
+      // Determine if user is guest based on LoginPage.tsx implementation
+      const isGuest = user?.email === 'guest@test.com' || user?.id.startsWith('guest_');
+
+      if (isAuthenticated && isGuest) {
+        console.log('🧹 Clearing stale guest session on browser restart');
+        logout();
+        return;
+      }
+
+      // Mark session as active for this tab
+      sessionStorage.setItem('erd_session_active', 'true');
+    }
+  }, [isAuthenticated, user, logout]);
+
   useEffect(() => {
     if (isAuthenticated) {
       connect();

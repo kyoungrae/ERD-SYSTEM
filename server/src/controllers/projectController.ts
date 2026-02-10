@@ -55,6 +55,7 @@ export const getProjects = async (req: AuthRequest, res: Response) => {
             .populate('members.userId', 'name email picture')
             .sort({ updatedAt: -1 });
 
+        res.set('Cache-Control', 'no-store');
         res.json(projects);
     } catch (error) {
         console.error('Get projects error:', error);

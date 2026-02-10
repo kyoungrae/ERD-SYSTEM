@@ -46,7 +46,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose }) => {
             type: 'IMPORT' as const,
             targetType: 'PROJECT' as const,
             targetName: 'Project',
-            details: `${importType === 'SQL' ? 'SQL 스크립트' : 'JSON 파일'}에서 ${data.entities.length}개의 테이블을 가져왔습니다.`
+            details: `${importType === 'SQL' ? 'SQL 스크립트' : 'JSON 파일'}에서 ${data.entities.length}개의 테이블을 가져왔습니다.`,
+            payload: {
+                importedTables: data.entities.map((e: any) => e.name)
+            }
         };
 
         addLog(logData);

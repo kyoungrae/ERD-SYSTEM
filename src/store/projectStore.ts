@@ -27,8 +27,12 @@ export const useProjectStore = create<ProjectStore>()(
                 if (!token) return;
 
                 try {
-                    const response = await fetch(API_URL, {
-                        headers: { 'Authorization': `Bearer ${token}` }
+                    const response = await fetch(`${API_URL}?t=${Date.now()}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Cache-Control': 'no-cache'
+                        },
+                        cache: 'no-store'
                     });
                     if (response.ok) {
                         const data = await response.json();
@@ -115,23 +119,33 @@ export const useProjectStore = create<ProjectStore>()(
 
             deleteProject: async (id) => {
                 const token = localStorage.getItem('auth-token');
-                if (!token) return;
 
-                try {
-                    const response = await fetch(`${API_URL}/${id}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                // If token exists, try to delete from server
+                if (token) {
+                    try {
+                        const response = await fetch(`${API_URL}/${id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
 
-                    if (response.ok) {
-                        set((state) => ({
-                            projects: state.projects.filter((p) => p.id !== id),
-                            currentProjectId: state.currentProjectId === id ? null : state.currentProjectId,
-                        }));
+                        // If not successful and not 404, stop here
+                        if (!response.ok && response.status !== 404) {
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Delete project error:', error);
+                        // Optional: stop on network error? 
+                        // For better UX on "clearing local list", we might want to proceed even on error,
+                        // but skipping for safety.
+                        return;
                     }
-                } catch (error) {
-                    console.error('Delete project error:', error);
                 }
+
+                // Remove from local state (runs if no token OR if server delete was successful/404)
+                set((state) => ({
+                    projects: state.projects.filter((p) => p.id !== id),
+                    currentProjectId: state.currentProjectId === id ? null : state.currentProjectId,
+                }));
             },
 
             setCurrentProject: (id) => set({ currentProjectId: id }),

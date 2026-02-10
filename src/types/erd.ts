@@ -60,6 +60,7 @@ export interface HistoryLog {
     targetType: 'ENTITY' | 'RELATIONSHIP' | 'PROJECT';
     targetName: string;
     details: string; // e.g., "Name: USER -> USERS", "Added column: id"
+    payload?: any;   // Additional data for detailed view
 }
 
 export interface ERDState {

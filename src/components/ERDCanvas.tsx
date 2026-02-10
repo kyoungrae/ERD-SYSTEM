@@ -77,7 +77,7 @@ const ERDCanvasContent: React.FC = () => {
     } = useERDStore();
 
     const { user, logout } = useAuthStore();
-    const { projects, currentProjectId, setCurrentProject, updateProjectData } = useProjectStore();
+    const { projects, currentProjectId, setCurrentProject } = useProjectStore();
 
     const currentProject = projects.find(p => p.id === currentProjectId);
 
@@ -93,7 +93,7 @@ const ERDCanvasContent: React.FC = () => {
     const { getViewport, screenToFlowPosition, getNodes } = useReactFlow();
 
     // Collaboration Store
-    const { updateCursor, sendOperation } = useSyncStore();
+    const { updateCursor, sendOperation, isSynced } = useSyncStore();
 
     // Broadcast cursor position
     const onPaneMouseMove = useCallback((event: React.MouseEvent) => {
@@ -101,9 +101,6 @@ const ERDCanvasContent: React.FC = () => {
             x: event.clientX,
             y: event.clientY,
         });
-
-
-
 
         updateCursor({ ...position });
     }, [screenToFlowPosition, getViewport, updateCursor]);
@@ -175,43 +172,6 @@ const ERDCanvasContent: React.FC = () => {
             const state = e.detail;
             if (!state) return;
 
-            // Check if server returned empty state (restarted/temp project)
-            // but we have local data we want to preserve and sync back
-            const isServerEmpty = !state.entities?.length && !state.relationships?.length;
-            const currentStore = useERDStore.getState();
-            const hasLocalData = currentStore.entities.length > 0 || currentStore.relationships.length > 0;
-
-            if (isServerEmpty && hasLocalData) {
-                console.log('⚠️ Server has empty state but local data exists. Re-broadcasting local state to server...');
-
-                // Re-broadcast all entities and relationships to restore server state
-                // We use a small delay to ensure socket and listeners are ready
-                const { sendOperation } = useSyncStore.getState();
-                const { user } = useAuthStore.getState();
-
-                currentStore.entities.forEach(entity => {
-                    sendOperation({
-                        type: 'ENTITY_CREATE',
-                        targetId: entity.id,
-                        userId: user?.id || 'anonymous',
-                        userName: user?.name || 'Anonymous',
-                        payload: entity as unknown as Record<string, unknown>
-                    });
-                });
-
-                currentStore.relationships.forEach(rel => {
-                    sendOperation({
-                        type: 'RELATIONSHIP_CREATE',
-                        targetId: rel.id,
-                        userId: user?.id || 'anonymous',
-                        userName: user?.name || 'Anonymous',
-                        payload: rel as unknown as Record<string, unknown>
-                    });
-                });
-
-                return; // Do NOT overwrite local data with empty server state
-            }
-
             console.log('Applying synced state:', state);
             importData(state);
         };
@@ -221,14 +181,19 @@ const ERDCanvasContent: React.FC = () => {
     }, [importData]);
 
 
-    // Initial load of project data into ERDStore
+    // Initial load of project data into ERDStore -> DISABLED to avoid stale data flash
+    /*
     useEffect(() => {
         if (currentProject) {
             importData(currentProject.data);
         }
     }, [currentProjectId]); // Run when project changes
+    */
 
-    // Auto-save ERDStore changes to ProjectStore
+
+
+    // Auto-save ERDStore changes to ProjectStore -> DISABLED (Using Socket.IO as Source of Truth)
+    /*
     useEffect(() => {
         if (currentProjectId) {
             const timer = setTimeout(() => {
@@ -240,6 +205,7 @@ const ERDCanvasContent: React.FC = () => {
             return () => clearTimeout(timer);
         }
     }, [entities, relationships, currentProjectId, updateProjectData]);
+    */
 
     useEffect(() => {
         setNodes((prevNodes) => {
@@ -669,6 +635,15 @@ const ERDCanvasContent: React.FC = () => {
             payload: { position: node.position }
         });
     }, [updateEntity, user, sendOperation]);
+
+    if (currentProjectId && !isSynced) {
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
+                <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
+                <p className="text-gray-500 font-medium">서버와 동기화 중...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="flex w-full h-screen overflow-hidden bg-gray-50">
