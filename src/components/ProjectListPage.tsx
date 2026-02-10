@@ -23,12 +23,24 @@ const ProjectListPage: React.FC = () => {
     React.useEffect(() => {
         fetchProjects();
 
-        // Check for pending invitation from login redirect
+        // Check for pending invitation from login redirect OR direct URL params if already logged in
+        const params = new URLSearchParams(window.location.search);
+        const urlInvite = params.get('invite');
         const pendingInvite = sessionStorage.getItem('pending-invite');
-        if (pendingInvite) {
-            setJoinCode(pendingInvite);
+
+        const inviteToProcess = urlInvite || pendingInvite;
+
+        if (inviteToProcess) {
+            setJoinCode(inviteToProcess.toUpperCase());
             setIsJoinModalOpen(true);
-            sessionStorage.removeItem('pending-invite');
+
+            // Clean up
+            if (urlInvite) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            if (pendingInvite) {
+                sessionStorage.removeItem('pending-invite');
+            }
         }
     }, [fetchProjects]);
 
