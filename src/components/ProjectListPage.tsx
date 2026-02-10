@@ -198,85 +198,129 @@ const ProjectListPage: React.FC = () => {
                                 onClick={() => setCurrentProject(project.id)}
                                 className="group bg-white rounded-[28px] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 hover:-translate-y-1 transition-all cursor-pointer flex flex-col h-full ring-0 hover:ring-2 ring-blue-500/20"
                             >
-                                <div className="flex items-start justify-between mb-6">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-3 bg-gray-50 text-blue-500 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
-                                            <Database size={24} />
-                                        </div>
-                                        <div className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                                            {project.dbType}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditingMembersProject(project.id);
-                                                setTempMembers(project.members || []);
-                                                setMemberInput('');
-                                            }}
-                                            className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                                            title="팀원 관리"
-                                        >
-                                            <Users size={18} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (window.confirm(`'${project.name}' 프로젝트를 삭제하시겠습니까?`)) {
-                                                    deleteProject(project.id);
-                                                }
-                                            }}
-                                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                            title="삭제"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                </div>
+                                {(() => {
+                                    const projectOwner = project.members?.find((m) => m.role === 'OWNER');
+                                    const isOwner = user?.id === projectOwner?.id;
+                                    return (
+                                        <>
+                                            <div className="flex items-start justify-between mb-6">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="p-3 bg-gray-50 text-blue-500 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                                                        <Database size={24} />
+                                                    </div>
+                                                    <div className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                                        {project.dbType}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {/* Team Management - Only Owner */}
+                                                    {isOwner && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingMembersProject(project.id);
+                                                                setTempMembers(project.members || []);
+                                                                setMemberInput('');
+                                                            }}
+                                                            className="p-2 text-gray-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                                            title="팀원 관리"
+                                                        >
+                                                            <Users size={18} />
+                                                        </button>
+                                                    )}
 
-                                <div className="mb-8">
-                                    <h3 className="text-xl font-black text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{project.name}</h3>
-                                    <p className="text-gray-500 text-sm line-clamp-2 font-medium">
-                                        {project.description || '상세 설명이 없습니다.'}
-                                    </p>
-                                </div>
+                                                    {/* Delete (Owner) or Leave (Member) */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const message = isOwner
+                                                                ? `'${project.name}' 프로젝트를 영구적으로 삭제하시겠습니까? (복구 불가)`
+                                                                : `'${project.name}' 프로젝트 목록에서 제거하시겠습니까? `;
 
-                                <div className="mt-auto pt-6 border-t border-gray-50 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-xs text-gray-400 font-bold uppercase tracking-wider">
-                                        <Clock size={12} />
-                                        {new Date(project.updatedAt).toLocaleString('ko-KR', {
-                                            year: 'numeric',
-                                            month: '2-digit',
-                                            day: '2-digit',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            hour12: false
-                                        })}
-                                    </div>
-
-                                    <div className="flex -space-x-2">
-                                        {project.members?.map((member) => (
-                                            <div
-                                                key={member.id}
-                                                className="w-7 h-7 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm"
-                                                title={`${member.name || 'Unknown'} (${member.role})`}
-                                            >
-                                                {member.picture ? (
-                                                    <img src={member.picture} alt={member.name || 'User'} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <span className="text-[10px] font-bold text-gray-400">
-                                                        {(member.name || '?').charAt(0)}
-                                                    </span>
-                                                )}
+                                                            if (window.confirm(message)) {
+                                                                deleteProject(project.id);
+                                                            }
+                                                        }}
+                                                        className={`p-2 rounded-xl transition-all ${isOwner
+                                                            ? 'text-gray-300 hover:text-red-500 hover:bg-red-50'
+                                                            : 'text-gray-300 hover:text-gray-600 hover:bg-gray-100'
+                                                            }`}
+                                                        title={isOwner ? "프로젝트 삭제" : "목록에서 제거"}
+                                                    >
+                                                        {isOwner ? <Trash2 size={18} /> : <LogOut size={18} />}
+                                                    </button>
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
 
-                                    <div className="p-2 bg-gray-50 text-gray-400 rounded-lg group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
-                                        <ChevronRight size={18} />
-                                    </div>
-                                </div>
+                                            <div className="mb-6">
+                                                <h3 className="text-xl font-black text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{project.name}</h3>
+
+                                                {/* Creator Info */}
+                                                {(() => {
+                                                    const projectOwner = project.members?.find((m) => m.role === 'OWNER');
+                                                    if (projectOwner) {
+                                                        return (
+                                                            <div className="flex items-center gap-2 mb-3">
+                                                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Created by</span>
+                                                                <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-100">
+                                                                    {projectOwner.picture ? (
+                                                                        <img src={projectOwner.picture} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                                                    ) : (
+                                                                        <div className="w-3.5 h-3.5 rounded-full bg-blue-100 flex items-center justify-center text-[8px] text-blue-600 font-bold">
+                                                                            {(projectOwner.name || '?').charAt(0)}
+                                                                        </div>
+                                                                    )}
+                                                                    <span className="text-xs text-gray-600 font-bold">{projectOwner.name}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+
+                                                <p className="text-gray-500 text-sm line-clamp-2 font-medium">
+                                                    {project.description || '상세 설명이 없습니다.'}
+                                                </p>
+                                            </div>
+
+                                            <div className="mt-auto pt-6 border-t border-gray-50 flex items-center justify-between">
+                                                <div className="flex items-center gap-2 text-xs text-gray-400 font-bold uppercase tracking-wider">
+                                                    <Clock size={12} />
+                                                    {new Date(project.updatedAt).toLocaleString('ko-KR', {
+                                                        year: 'numeric',
+                                                        month: '2-digit',
+                                                        day: '2-digit',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: false
+                                                    })}
+                                                </div>
+
+                                                <div className="flex -space-x-2">
+                                                    {project.members?.map((member) => (
+                                                        <div
+                                                            key={member.id}
+                                                            className="w-7 h-7 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden shadow-sm"
+                                                            title={`${member.name || 'Unknown'} (${member.role})`}
+                                                        >
+                                                            {member.picture ? (
+                                                                <img src={member.picture} alt={member.name || 'User'} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-gray-400">
+                                                                    {(member.name || '?').charAt(0)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <div className="p-2 bg-gray-50 text-gray-400 rounded-lg group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
+                                                    <ChevronRight size={18} />
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>
