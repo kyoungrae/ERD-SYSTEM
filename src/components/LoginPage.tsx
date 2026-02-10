@@ -5,23 +5,64 @@ import { useProjectStore } from '../store/projectStore';
 
 const LoginPage: React.FC = () => {
     const { login } = useAuthStore();
-    const { setCurrentProject } = useProjectStore();
+    const { setCurrentProject, joinWithCode } = useProjectStore();
     const [isSignup, setIsSignup] = useState(false);
     const [isCodeSent, setIsCodeSent] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [name, setName] = useState('');
     const [verificationCode, setVerificationCode] = useState('');
+    const [invitationCode, setInvitationCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    React.useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const inviteCode = params.get('invite');
+        const invitedEmail = params.get('email');
+
+        if (inviteCode) {
+            setInvitationCode(inviteCode.toUpperCase());
+        }
+
+        if (invitedEmail) {
+            setEmail(invitedEmail);
+            // Check if user exists to decide whether to show login or signup
+            const checkUser = async () => {
+                try {
+                    const response = await fetch(`http://localhost:3001/api/auth/check-email?email=${encodeURIComponent(invitedEmail)}`);
+                    const data = await response.json();
+                    if (data.exists) {
+                        setIsSignup(false);
+                    } else {
+                        setIsSignup(true);
+                    }
+                } catch (err) {
+                    console.error('Check email failed:', err);
+                }
+            };
+            checkUser();
+        }
+
+        if (inviteCode || invitedEmail) {
+            // Optionally clear the URL param for cleanliness
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
 
     const API_URL = 'http://localhost:3001/api/auth';
 
     const handleRequestCode = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email || !password || !name) {
+        if (!email || !password || !name || !confirmPassword) {
             setError('모든 정보를 입력해주세요.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setError('비밀번호가 일치하지 않습니다.');
             return;
         }
 
@@ -74,8 +115,19 @@ const LoginPage: React.FC = () => {
             }
 
             localStorage.setItem('auth-token', data.token);
-            setCurrentProject(null);
             login(data.user, data.token);
+
+            // If there's an invitation code, try to join immediately
+            if (invitationCode.trim()) {
+                try {
+                    await joinWithCode(invitationCode.trim());
+                } catch (inviteErr) {
+                    console.error('Auto-join failed:', inviteErr);
+                    // We don't block the login, just log it.
+                }
+            }
+
+            setCurrentProject(null);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -209,6 +261,29 @@ const LoginPage: React.FC = () => {
                                             className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
                                         />
                                     </div>
+
+                                    {isSignup && (
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 ml-1">
+                                                <ShieldCheck size={14} className={`transition-colors ${confirmPassword && password !== confirmPassword ? 'text-red-500' : 'text-blue-500'}`} />
+                                                비밀번호 확인
+                                            </label>
+                                            <input
+                                                type="password"
+                                                required
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                placeholder="••••••••"
+                                                className={`w-full px-5 py-3.5 bg-gray-50 border rounded-2xl focus:bg-white focus:ring-4 outline-none transition-all placeholder:text-gray-300 ${confirmPassword && password !== confirmPassword
+                                                    ? 'border-red-200 focus:ring-red-500/10 focus:border-red-500'
+                                                    : 'border-gray-100 focus:ring-blue-500/10 focus:border-blue-500'
+                                                    }`}
+                                            />
+                                            {confirmPassword && password !== confirmPassword && (
+                                                <p className="text-[11px] text-red-500 ml-1 font-medium animate-in fade-in slide-in-from-top-1">비밀번호가 일치하지 않습니다.</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </>
                             )}
 
@@ -236,6 +311,8 @@ const LoginPage: React.FC = () => {
                                     </button>
                                 </div>
                             )}
+
+
 
                             {error && (
                                 <div className="p-3 bg-red-50 text-red-500 text-xs rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-1">

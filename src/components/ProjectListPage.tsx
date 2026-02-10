@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { type DBType, type ProjectMember } from '../types/erd';
 
 const ProjectListPage: React.FC = () => {
-    const { projects, fetchProjects, addProject, addRemoteProject, deleteProject, setCurrentProject, updateProjectMembers } = useProjectStore();
+    const { projects, fetchProjects, addProject, addRemoteProject, deleteProject, setCurrentProject, updateProjectMembers, inviteMember, joinWithCode } = useProjectStore();
     const { user, logout } = useAuthStore();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingMembersProject, setEditingMembersProject] = useState<string | null>(null);
@@ -24,21 +24,39 @@ const ProjectListPage: React.FC = () => {
 
     const targetProject = projects.find(p => p.id === editingMembersProject);
 
-    const handleAddMember = (isEditing: boolean = false) => {
+    const handleAddMember = async (isEditing: boolean = false) => {
         if (!memberInput.trim()) return;
+
+        if (isEditing && editingMembersProject) {
+            try {
+                setIsLoading(true);
+                await inviteMember(editingMembersProject, memberInput.trim());
+                alert('초대 메일이 발송되었습니다.');
+                setMemberInput('');
+                // Refresh members list
+                await fetchProjects();
+                const updatedProject = projects.find(p => p.id === editingMembersProject);
+                if (updatedProject) setTempMembers(updatedProject.members || []);
+            } catch (err: any) {
+                alert(err.message || '초대에 실패했습니다.');
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
 
         const currentMembers = isEditing ? tempMembers : newProjectMembers;
 
-        // Check for duplicates
-        if (currentMembers.some(m => m.name === memberInput.trim())) {
+        // ... (existing mock logic for new projects)
+        if (currentMembers.some(m => m.name === memberInput.trim() || m.email === memberInput.trim())) {
             alert('이미 추가된 팀원입니다.');
             return;
         }
 
         const newMember: ProjectMember = {
             id: `mem_${Date.now()}`,
-            name: memberInput.trim(),
-            email: `${memberInput.trim().toLowerCase()}@example.com`,
+            name: memberInput.trim().split('@')[0],
+            email: memberInput.trim(),
             role: 'MEMBER'
         };
 
@@ -71,6 +89,28 @@ const ProjectListPage: React.FC = () => {
         }
     };
 
+    const handleJoinProject = async (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return;
+
+        try {
+            setIsLoading(true);
+            if (trimmed.length === 8) {
+                // Invitation code
+                await joinWithCode(trimmed);
+                alert('프로젝트에 참여되었습니다.');
+                await fetchProjects();
+            } else {
+                // Project ID
+                await addRemoteProject(trimmed);
+            }
+        } catch (err: any) {
+            alert(err.message || '프로젝트 참여에 실패했습니다.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim()) return;
@@ -99,7 +139,23 @@ const ProjectListPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-gray-50 flex flex-col relative">
+            {/* Full Screen Loading Overlay */}
+            {isLoading && (
+                <div className="fixed inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex flex-col items-center justify-center animate-in fade-in duration-200">
+                    <div className="relative">
+                        <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Database className="text-blue-600 animate-pulse" size={20} />
+                        </div>
+                    </div>
+                    <div className="mt-6 flex flex-col items-center">
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">처리 중입니다</h3>
+                        <p className="text-sm text-gray-500 font-medium tracking-tight">잠시만 기다려주세요...</p>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -148,7 +204,7 @@ const ProjectListPage: React.FC = () => {
                                     if (e.key === 'Enter') {
                                         const target = e.target as HTMLInputElement;
                                         if (target.value.trim()) {
-                                            addRemoteProject(target.value.trim());
+                                            handleJoinProject(target.value.trim());
                                         }
                                     }
                                 }}
@@ -157,7 +213,7 @@ const ProjectListPage: React.FC = () => {
                                 onClick={(e) => {
                                     const input = e.currentTarget.previousElementSibling as HTMLInputElement;
                                     if (input.value.trim()) {
-                                        addRemoteProject(input.value.trim());
+                                        handleJoinProject(input.value.trim());
                                     }
                                 }}
                                 className="absolute right-2 p-1.5 bg-gray-100 text-gray-500 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors"
@@ -241,13 +297,10 @@ const ProjectListPage: React.FC = () => {
                                                                 deleteProject(project.id);
                                                             }
                                                         }}
-                                                        className={`p-2 rounded-xl transition-all ${isOwner
-                                                            ? 'text-gray-300 hover:text-red-500 hover:bg-red-50'
-                                                            : 'text-gray-300 hover:text-gray-600 hover:bg-gray-100'
-                                                            }`}
+                                                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                                                         title={isOwner ? "프로젝트 삭제" : "목록에서 제거"}
                                                     >
-                                                        {isOwner ? <Trash2 size={18} /> : <LogOut size={18} />}
+                                                        <Trash2 size={18} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -388,7 +441,7 @@ const ProjectListPage: React.FC = () => {
                                             value={memberInput}
                                             onChange={(e) => setMemberInput(e.target.value)}
                                             onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddMember())}
-                                            placeholder="팀원 이름을 입력하세요"
+                                            placeholder="초대할 팀원의 이메일을 입력하세요"
                                             className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium text-sm"
                                         />
                                     </div>
@@ -524,7 +577,7 @@ const ProjectListPage: React.FC = () => {
                                             value={memberInput}
                                             onChange={(e) => setMemberInput(e.target.value)}
                                             onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddMember(true))}
-                                            placeholder="팀원 이름을 입력하세요"
+                                            placeholder="초대할 팀원의 이메일을 입력하세요"
                                             className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium text-sm"
                                         />
                                     </div>

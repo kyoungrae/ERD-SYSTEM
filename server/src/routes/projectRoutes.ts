@@ -1,13 +1,18 @@
 import { Router } from 'express';
-import { createProject, getProjects, deleteProject, updateProject } from '../controllers/projectController';
+import { createProject, getProjects, deleteProject, updateProject, getProject, createInvitation, joinProjectWithCode } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// All project routes require authentication
+// This route allowed for guests to fetch project metadata when joining via ID
+router.get('/:id', getProject);
+
+// All other project routes require authentication
 router.use(authMiddleware);
 
 router.post('/', createProject);
+router.post('/invite', createInvitation);
+router.post('/join-with-code', joinProjectWithCode);
 router.get('/', getProjects);
 router.patch('/:id', updateProject);
 router.delete('/:id', deleteProject);

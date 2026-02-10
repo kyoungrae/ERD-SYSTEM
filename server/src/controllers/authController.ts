@@ -113,3 +113,18 @@ export const login = async (req: Request, res: Response) => {
         res.status(500).json({ message: '로그인 중 오류가 발생했습니다.' });
     }
 };
+
+export const checkEmail = async (req: Request, res: Response) => {
+    try {
+        const { email } = req.query;
+        if (!email) {
+            return res.status(400).json({ message: '이메일이 필요합니다.' });
+        }
+
+        const user = await User.findOne({ email });
+        res.json({ exists: !!user });
+    } catch (error) {
+        console.error('Check email error:', error);
+        res.status(500).json({ message: '이메일 확인 중 오류가 발생했습니다.' });
+    }
+};
