@@ -162,6 +162,63 @@ export class PresenceManager {
 
         return cursors;
     }
+    /**
+     * Clear all project-related keys from Redis using pattern matching (Robust)
+     */
+    async clearAllProjectKeys(projectId: string): Promise<void> {
+        const pattern = `project:${projectId}:*`;
+        let cursor = '0';
+        try {
+            do {
+                const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+                cursor = nextCursor;
+                if (keys.length > 0) {
+                    await redis.del(...keys);
+                }
+            } while (cursor !== '0');
+            console.log(`🧹 Cleaned up all Redis keys for project: ${projectId}`);
+        } catch (error) {
+            console.error('Clear all project keys error:', error);
+        }
+    }
+
+    /**
+     * Clear all presence data for a project (when project is deleted)
+     * @deprecated Use clearAllProjectKeys for complete cleanup
+     */
+    async clearAllData(projectId: string): Promise<void> {
+        await this.clearAllProjectKeys(projectId);
+    }
+
+    /**
+     * Remove a specific user's presence from a project (when excluded)
+     */
+    async removeUserPresence(projectId: string, userId: string): Promise<void> {
+        const onlineKey = `project:${projectId}:online`;
+        const cursorKey = `project:${projectId}:cursors`;
+
+        try {
+            // Remove from online list (find all clientIds for this userId)
+            const allOnline = await redis.hgetall(onlineKey);
+            for (const [clientId, data] of Object.entries(allOnline)) {
+                const user = JSON.parse(data);
+                if (user.id === userId) {
+                    await redis.hdel(onlineKey, clientId);
+                }
+            }
+
+            // Remove cursor (find all clientIds for this userId)
+            const allCursors = await redis.hgetall(cursorKey);
+            for (const [clientId, data] of Object.entries(allCursors)) {
+                const cursor = JSON.parse(data);
+                if (cursor.userId === userId) {
+                    await redis.hdel(cursorKey, clientId);
+                }
+            }
+        } catch (error) {
+            console.error('Remove user presence error:', error);
+        }
+    }
 }
 
 // Project State Manager
@@ -221,6 +278,17 @@ export class ProjectStateManager {
         // Only initialize if Redis doesn't have state
         if (!existing) {
             await this.saveState(projectId, entities, relationships, version);
+        }
+    }
+    /**
+     * Clear project state from Redis (when project is deleted)
+     */
+    async clearAllData(projectId: string): Promise<void> {
+        const stateKey = `project:${projectId}:state`;
+        try {
+            await redis.del(stateKey);
+        } catch (error) {
+            console.error('Clear project state error:', error);
         }
     }
 }

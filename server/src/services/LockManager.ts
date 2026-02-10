@@ -159,6 +159,18 @@ export class LockManager {
             console.error('Release all user locks error:', error);
         }
     }
+
+    /**
+     * Clear all locks for a project (when project is deleted)
+     */
+    async clearAllData(projectId: string): Promise<void> {
+        const lockKey = `project:${projectId}:locks`;
+        try {
+            await redis.del(lockKey);
+        } catch (error) {
+            console.error('Clear project locks error:', error);
+        }
+    }
 }
 
 export const lockManager = new LockManager();

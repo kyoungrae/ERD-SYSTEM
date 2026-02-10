@@ -3,6 +3,8 @@ import { Project, Invitation, User } from '../models';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { Types } from 'mongoose';
 import { sendInvitationEmail } from '../services/EmailService';
+import { presenceManager, projectStateManager } from '../services/PresenceManager';
+import { lockManager } from '../services/LockManager';
 import crypto from 'crypto';
 
 export const createProject = async (req: AuthRequest, res: Response) => {
@@ -86,6 +88,9 @@ export const deleteProject = async (req: AuthRequest, res: Response) => {
 
         await Project.findByIdAndDelete(id);
 
+        // Robust cleanup of all project-related keys in Redis
+        await presenceManager.clearAllProjectKeys(id);
+
         res.json({ message: '프로젝트가 삭제되었습니다.' });
     } catch (error) {
         console.error('Delete project error:', error);
@@ -129,16 +134,27 @@ export const updateProject = async (req: AuthRequest, res: Response) => {
 
         // Only OWNER can modify members
         if (req.body.members && member?.role === 'OWNER') {
+            const oldMemberIds = project.members.map(m => m.userId.toString());
             const newMembers = req.body.members.map((m: any) => ({
                 userId: new Types.ObjectId(m.id),
                 role: m.role,
                 joinedAt: m.joinedAt || new Date()
             }));
+            const newMemberIds = newMembers.map((m: any) => m.userId.toString());
+
+            // Identify removed members logic
+            const removedMemberIds = oldMemberIds.filter(id => !newMemberIds.includes(id));
 
             // Ensure owner remains
             const hasOwner = newMembers.some((m: any) => m.role === 'OWNER');
             if (hasOwner) {
                 project.members = newMembers;
+
+                // Cleanup Redis for removed members asynchronously
+                removedMemberIds.forEach(async (mid) => {
+                    await presenceManager.removeUserPresence(id, mid);
+                    await lockManager.releaseAllUserLocks(id, mid);
+                });
             }
         }
 
