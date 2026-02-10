@@ -38,17 +38,45 @@ graph TD
 scp -P 22222 -r ./ERD-SYSTEM vims@192.168.0.141:~/
 ```
 
-### 단계 2: 컨테이너 실행 (Podman)
-운영 서버 내부에서 `erd-system` 디렉토리로 이동한 후 실행합니다. 외부 회선이 막혀있다면 미리 빌드된 이미지를 가져오거나 내부 레지스트리를 사용해야 할 수 있습니다.
+### 단계 2: 컨테이너 빌드 및 전송 (외부 회선 차단 시 권장)
 
+운영 서버에 외부 인터넷(`npm`) 접속이 안 되는 경우, 로컬 개발 PC에서 이미지를 미리 빌드하여 전송하는 방식이 가장 확실합니다.
+
+#### 1) 로컬 PC에서 이미지 빌드 및 저장
 ```bash
 cd ~/ERD-SYSTEM
 
-# 모든 서비스 빌드 및 실행
-podman-compose up -d --build
+# 프론트엔드 이미지 빌드 및 저장
+podman build -t erd-frontend -f Dockerfile.frontend .
+podman save erd-frontend > erd-frontend.tar
+
+# 백엔드 이미지 빌드 및 저장
+podman build -t erd-backend -f server/Dockerfile ./server
+podman save erd-backend > erd-backend.tar
 ```
-> [!NOTE]
-> `podman ps` 명령어로 4개의 컨테이너(`erd-mongodb`, `erd-redis`, `erd-backend`, `erd-frontend`)가 정상 작동 중인지 확인하세요.
+
+#### 2) 운영 서버로 이미지 전송
+```bash
+# 생성된 .tar 파일들을 운영 서버로 전송
+scp -P 22222 erd-frontend.tar erd-backend.tar vims@192.168.0.141:~/ERD-SYSTEM/
+```
+
+#### 3) 운영 서버에서 이미지 로드 및 실행
+운영 서버 접속 후 실행합니다.
+```bash
+cd ~/ERD-SYSTEM
+
+# 이미지 로드
+podman load < erd-frontend.tar
+podman load < erd-backend.tar
+
+# 컨테이너 실행 (빌드 생략)
+podman-compose up -d
+```
+> [!TIP]
+> `podman-compose up` 실행 시 이미지가 이미 로드되어 있으므로 별도의 다운로드나 빌드 과정 없이 즉시 실행됩니다.
+
+---
 
 ### 단계 3: Nginx Gateway (Port 8080) 설정 업데이트
 현재 다른 프로젝트들이 사용하는 방식인 **`host.containers.internal` 루프백**을 활용하여 `nginx_web` 설정에 아래 내용을 추가합니다.
