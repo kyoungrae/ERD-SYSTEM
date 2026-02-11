@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createProject, getProjects, deleteProject, updateProject, getProject, createInvitation, joinProjectWithCode } from '../controllers/projectController';
+import { createProject, getProjects, deleteProject, updateProject, getProject, createInvitation, joinProjectWithCode, joinProjectById } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -13,6 +13,7 @@ router.use(authMiddleware);
 router.post('/', createProject);
 router.post('/invite', createInvitation);
 router.post('/join-with-code', joinProjectWithCode);
+router.post('/:id/join', joinProjectById);
 router.get('/', getProjects);
 router.patch('/:id', updateProject);
 router.delete('/:id', deleteProject);

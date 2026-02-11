@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FolderOpen, Trash2, Clock, ChevronRight, LogOut, Database, Users, UserPlus, UserMinus, X, Share2, AlertTriangle } from 'lucide-react';
+import { Plus, FolderOpen, Trash2, Clock, ChevronRight, LogOut, Database, Users, UserPlus, UserMinus, X, Share2, AlertTriangle, Link } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useAuthStore } from '../store/authStore';
 import { type DBType, type ProjectMember } from '../types/erd';
@@ -18,6 +18,7 @@ const ProjectListPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
     const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+    const [joinMode, setJoinMode] = useState<'CODE' | 'ID'>('CODE');
     const [joinCode, setJoinCode] = useState('');
 
     React.useEffect(() => {
@@ -32,6 +33,7 @@ const ProjectListPage: React.FC = () => {
 
         if (inviteToProcess) {
             setJoinCode(inviteToProcess.toUpperCase());
+            setJoinMode('CODE');
             setIsJoinModalOpen(true);
 
             // Clean up
@@ -239,7 +241,20 @@ const ProjectListPage: React.FC = () => {
                     </div>
                     <div className="flex gap-3">
                         <button
-                            onClick={() => setIsJoinModalOpen(true)}
+                            onClick={() => {
+                                setJoinMode('ID');
+                                setIsJoinModalOpen(true);
+                            }}
+                            className="flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-2xl font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                        >
+                            <Link size={20} className="text-purple-500" />
+                            프로젝트 ID로 참여
+                        </button>
+                        <button
+                            onClick={() => {
+                                setJoinMode('CODE');
+                                setIsJoinModalOpen(true);
+                            }}
                             className="flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-2xl font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95 whitespace-nowrap"
                         >
                             <Share2 size={20} className="text-blue-500" />
@@ -417,8 +432,12 @@ const ProjectListPage: React.FC = () => {
                     <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden scale-in">
                         <div className="p-8 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h3 className="text-2xl font-black text-gray-900 mb-1">프로젝트 참여</h3>
-                                <p className="text-gray-500 font-medium text-sm">초대 코드 또는 프로젝트 ID를 입력하세요.</p>
+                                <h3 className="text-2xl font-black text-gray-900 mb-1">
+                                    {joinMode === 'CODE' ? '초대 코드로 참여' : '프로젝트 ID로 참여'}
+                                </h3>
+                                <p className="text-gray-500 font-medium text-sm">
+                                    {joinMode === 'CODE' ? '공유받은 초대 코드를 입력하세요.' : '참여할 프로젝트의 고유 ID를 입력하세요.'}
+                                </p>
                             </div>
                             <button
                                 onClick={() => setIsJoinModalOpen(false)}
@@ -431,14 +450,14 @@ const ProjectListPage: React.FC = () => {
                         <div className="p-8 space-y-6">
                             <div className="space-y-1.5">
                                 <label className="flex items-center gap-2 text-sm font-bold text-gray-700 ml-1">
-                                    <Database size={14} className="text-blue-500" />
-                                    초대 코드 / 프로젝트 ID
+                                    {joinMode === 'CODE' ? <Share2 size={14} className="text-blue-500" /> : <Link size={14} className="text-purple-500" />}
+                                    {joinMode === 'CODE' ? '초대 코드' : '프로젝트 ID'}
                                 </label>
                                 <input
                                     type="text"
                                     value={joinCode}
-                                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                                    placeholder="8자리 코드 또는 ID 입력"
+                                    onChange={(e) => setJoinCode(joinMode === 'CODE' ? e.target.value.toUpperCase() : e.target.value)}
+                                    placeholder={joinMode === 'CODE' ? '8자리 초대 코드 입력' : '프로젝트 ID (mongoId 등) 입력'}
                                     className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold tracking-wider text-center text-lg"
                                 />
                             </div>

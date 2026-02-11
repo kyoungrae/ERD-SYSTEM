@@ -146,6 +146,12 @@ const ERDCanvasContent: React.FC = () => {
                         updateEntity(op.targetId, { attributes: op.payload.attributes }, remoteUser);
                     }
                     break;
+                case 'ATTRIBUTE_FIELD_UPDATE':
+                    // Granular update for a single field in a single attribute
+                    if (op.payload.attrId && op.payload.updates) {
+                        (useERDStore.getState() as any).updateAttribute(op.targetId, op.payload.attrId, op.payload.updates, remoteUser);
+                    }
+                    break;
                 case 'RELATIONSHIP_CREATE':
                     addRelationship(op.payload, remoteUser);
                     break;

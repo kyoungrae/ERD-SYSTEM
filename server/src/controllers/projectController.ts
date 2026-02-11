@@ -276,3 +276,35 @@ export const joinProjectWithCode = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ message: '프로젝트 참여 중 오류가 발생했습니다.' });
     }
 };
+
+export const joinProjectById = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.id;
+
+        if (!userId) return res.status(401).json({ message: '인증 필요' });
+
+        const project = await Project.findById(id);
+        if (!project) return res.status(404).json({ message: '프로젝트를 찾을 수 없습니다.' });
+
+        // Check if already a member
+        const isAlreadyMember = project.members.some(m => m.userId.toString() === userId);
+        if (isAlreadyMember) {
+            return res.json({ message: '이미 참여 중인 프로젝트입니다.', projectId: project._id });
+        }
+
+        // Add member as EDITOR by default when joining via ID
+        project.members.push({
+            userId: new Types.ObjectId(userId),
+            role: 'EDITOR',
+            joinedAt: new Date()
+        });
+
+        await project.save();
+
+        res.json({ message: '프로젝트에 참여되었습니다.', projectId: project._id });
+    } catch (error) {
+        console.error('Join project by ID error:', error);
+        res.status(500).json({ message: '프로젝트 참여 중 오류가 발생했습니다.' });
+    }
+};

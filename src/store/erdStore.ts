@@ -20,6 +20,7 @@ interface ERDStore extends ERDState {
     importData: (data: ERDState) => void;
     mergeData: (data: ERDState, overwrite?: boolean) => void;
 
+    updateAttribute: (entityId: string, attrId: string, updates: Partial<Attribute>, user?: any) => void;
     undo: () => void;
     redo: () => void;
     addLog: (log: Omit<HistoryLog, 'id' | 'timestamp'>) => void;
@@ -220,6 +221,34 @@ export const useERDStore = create<ERDStore>((set, get) => {
                 relationships: state.relationships.filter((r) => r.id !== id),
                 history: [createLog(user, 'DELETE', 'RELATIONSHIP', id, `Deleted relationship`), ...state.history].slice(0, 100)
             })),
+
+        updateAttribute: (entityId, attrId, updates, user) =>
+            set((state) => {
+                const entity = state.entities.find(e => e.id === entityId);
+                if (!entity) return state;
+
+                const newAttributes = entity.attributes.map(attr =>
+                    attr.id === attrId ? { ...attr, ...updates } : attr
+                );
+
+                const newEntities = state.entities.map(e =>
+                    e.id === entityId ? { ...e, attributes: newAttributes } : e
+                );
+
+                // For history logging
+                const attr = entity.attributes.find(a => a.id === attrId);
+                const changes = Object.entries(updates)
+                    .map(([key, value]) => `${key}: ${(attr as any)?.[key]} -> ${value}`)
+                    .join(', ');
+
+                const log = createLog(user, 'UPDATE', 'ENTITY', entity.name, `Updated column '${attr?.name}': ${changes}`);
+
+                return {
+                    ...pushHistory(state),
+                    entities: newEntities,
+                    history: [log, ...state.history].slice(0, 100)
+                };
+            }),
 
         undo: () =>
             set((state) => {

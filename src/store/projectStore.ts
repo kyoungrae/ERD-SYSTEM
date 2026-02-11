@@ -119,7 +119,7 @@ export const useProjectStore = create<ProjectStore>()(
                 const token = localStorage.getItem('auth-token');
 
                 // Check if already in list
-                const { projects } = useProjectStore.getState();
+                const { projects, fetchProjects } = useProjectStore.getState();
                 if (projects.find((p) => p.id === id)) {
                     set({ currentProjectId: id });
                     return;
@@ -127,37 +127,49 @@ export const useProjectStore = create<ProjectStore>()(
 
                 try {
                     const headers: Record<string, string> = {};
-                    if (token) headers['Authorization'] = `Bearer ${token}`;
+                    if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                        // Officially join the project on the server
+                        const joinResponse = await fetch(`${API_URL}/${id}/join`, {
+                            method: 'POST',
+                            headers
+                        });
 
-                    const response = await fetch(`${API_URL}/${id}`, {
-                        headers
-                    });
+                        if (!joinResponse.ok) {
+                            const errorData = await joinResponse.json();
+                            throw new Error(errorData.message || 'Failed to join project');
+                        }
 
-                    if (!response.ok) {
-                        throw new Error('Project not found or access denied');
+                        // After joining, refresh the full projects list
+                        await fetchProjects();
+                        set({ currentProjectId: id });
+                    } else {
+                        // Guest mode: just fetch and add to local list
+                        const response = await fetch(`${API_URL}/${id}`, { headers });
+                        if (!response.ok) throw new Error('Project not found or access denied');
+
+                        const p = await response.json();
+                        const newProject: Project = {
+                            ...p,
+                            id: p._id,
+                            members: p.members?.map((m: any) => ({
+                                id: m.userId?._id || m.userId,
+                                name: m.userId?.name || 'Unknown',
+                                email: m.userId?.email || '',
+                                picture: m.userId?.picture,
+                                role: m.role || 'MEMBER'
+                            })),
+                            data: p.data || (p.currentSnapshot?.entities ? p.currentSnapshot : { entities: [], relationships: [] })
+                        };
+
+                        set((state) => ({
+                            projects: [newProject, ...state.projects],
+                            currentProjectId: id,
+                        }));
                     }
-
-                    const p = await response.json();
-                    const newProject: Project = {
-                        ...p,
-                        id: p._id,
-                        members: p.members?.map((m: any) => ({
-                            id: m.userId?._id || m.userId,
-                            name: m.userId?.name || 'Unknown',
-                            email: m.userId?.email || '',
-                            picture: m.userId?.picture,
-                            role: m.role || 'MEMBER'
-                        })),
-                        data: p.data || (p.currentSnapshot?.entities ? p.currentSnapshot : { entities: [], relationships: [] })
-                    };
-
-                    set((state) => ({
-                        projects: [newProject, ...state.projects],
-                        currentProjectId: id,
-                    }));
-                } catch (error) {
+                } catch (error: any) {
                     console.error('Add remote project error:', error);
-                    alert('프로젝트를 찾을 수 없거나 접근 권한이 없습니다.');
+                    alert(error.message || '프로젝트를 찾을 수 없거나 접근 권한이 없습니다.');
                 }
             },
 
