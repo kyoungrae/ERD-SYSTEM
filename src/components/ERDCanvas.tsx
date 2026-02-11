@@ -33,6 +33,7 @@ import { OnlineUsers, UserCursors } from './collaboration';
 import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as UserIcon, Home, Layout, ArrowDown, ArrowRight, ChevronDown, Frame, Zap, Undo2, Redo2, History } from 'lucide-react';
 import { getLayoutedElements } from '../utils/layout';
 import { getForceLayoutedElements } from '../utils/forceLayout';
+import { generateSQLFromERD } from '../utils/sqlGenerator';
 
 const nodeTypes: NodeTypes = {
     entity: EntityNode,
@@ -89,6 +90,7 @@ const ERDCanvasContent: React.FC = () => {
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
     const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
+    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const flowWrapper = React.useRef<HTMLDivElement>(null);
     const { getViewport, screenToFlowPosition, getNodes } = useReactFlow();
 
@@ -447,7 +449,7 @@ const ERDCanvasContent: React.FC = () => {
         });
     }, [entities, addEntity, user, sendOperation]);
 
-    const handleExport = () => {
+    const handleExportJSON = () => {
         const data = exportData();
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -456,6 +458,23 @@ const ERDCanvasContent: React.FC = () => {
         a.download = `erd-diagram-${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(url);
+        setIsExportMenuOpen(false);
+    };
+
+    const handleExportSQL = () => {
+        const sql = generateSQLFromERD(entities, relationships, currentProject?.dbType || 'MySQL');
+        const blob = new Blob([sql], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `erd-schema-${Date.now()}.sql`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setIsExportMenuOpen(false);
+    };
+
+    const handleExport = () => {
+        setIsExportMenuOpen(!isExportMenuOpen);
     };
 
 
@@ -791,13 +810,45 @@ const ERDCanvasContent: React.FC = () => {
 
                     <div className="w-[1px] h-8 bg-gray-200 mx-1 self-center" />
 
-                    <button
-                        onClick={handleExport}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm font-bold shadow-sm active:scale-95"
-                    >
-                        <Upload size={16} className="text-green-500" />
-                        내보내기
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={handleExport}
+                            className="flex items-center gap-2 px-3.5 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm font-bold shadow-sm active:scale-95"
+                        >
+                            <Upload size={16} className="text-green-500" />
+                            <span>내보내기</span>
+                            <ChevronDown size={14} className={`text-gray-400 transition-transform ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isExportMenuOpen && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 p-1.5 z-50 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-200">
+                                <button
+                                    onClick={handleExportJSON}
+                                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors text-left"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
+                                        <span className="text-[10px] font-bold">JSON</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="font-bold">JSON으로 내보내기</span>
+                                        <span className="text-[10px] text-gray-400">프로젝트 데이터 원본</span>
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={handleExportSQL}
+                                    className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors text-left"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-500">
+                                        <span className="text-[10px] font-bold">SQL</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="font-bold">SQL DDL로 내보내기</span>
+                                        <span className="text-[10px] text-gray-400">DDL 스크립트 (.sql)</span>
+                                    </div>
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     <button
                         onClick={() => setIsImportModalOpen(true)}
