@@ -32,7 +32,8 @@ const LoginPage: React.FC = () => {
             // Check if user exists to decide whether to show login or signup
             const checkUser = async () => {
                 try {
-                    const response = await fetch(`http://localhost:3001/api/auth/check-email?email=${encodeURIComponent(invitedEmail)}`);
+                    const AUTH_API = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:3001/api/auth';
+                    const response = await fetch(`${AUTH_API}/check-email?email=${encodeURIComponent(invitedEmail)}`);
                     const data = await response.json();
                     if (data.exists) {
                         setIsSignup(false);
@@ -52,7 +53,7 @@ const LoginPage: React.FC = () => {
         }
     }, []);
 
-    const API_URL = 'http://localhost:3001/api/auth';
+    const API_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:3001/api/auth';
 
     const handleRequestCode = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -223,7 +224,7 @@ const LoginPage: React.FC = () => {
                                                 required
                                                 value={name}
                                                 onChange={(e) => setName(e.target.value)}
-                                                placeholder="홍길동"
+                                                placeholder="이름"
                                                 className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-gray-300"
                                             />
                                         </div>

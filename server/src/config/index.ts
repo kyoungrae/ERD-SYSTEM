@@ -21,6 +21,7 @@ export const config = {
     },
 
     frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+    basePath: process.env.BASE_PATH || '', // e.g. /erd
 
     email: {
         host: process.env.EMAIL_HOST || 'smtp.gmail.com',

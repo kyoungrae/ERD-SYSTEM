@@ -1,4 +1,4 @@
-import { useSyncStore, type LockInfo } from '../../store/syncStore';
+import { useSyncStore } from '../../store/syncStore';
 import { useAuthStore } from '../../store/authStore';
 
 interface EntityLockBadgeProps {
@@ -18,8 +18,8 @@ export function EntityLockBadge({ entityId }: EntityLockBadgeProps) {
     return (
         <div
             className={`absolute -top-2 -right-2 px-2 py-0.5 rounded-full text-xs flex items-center gap-1 shadow-lg z-10 ${isOwnLock
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-amber-500 text-black'
+                ? 'bg-blue-500 text-white'
+                : 'bg-amber-500 text-black'
                 }`}
         >
             {isOwnLock ? (
