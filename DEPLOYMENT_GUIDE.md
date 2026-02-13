@@ -212,7 +212,9 @@ podman pull docker.io/library/mongo:4.4
 
 # 3. 서비스 재시작 (한 줄씩 복사)
 podman run -d --name erd-mongodb --network erd-network -p 27017:27017 -v ~/projects/erd-system/db_data:/data/db -e MONGO_INITDB_DATABASE=erd-system --restart unless-stopped docker.io/library/mongo:4.4
+
 podman run -d --name erd-backend --network erd-network -p 3001:3001 -e NODE_ENV=production -e MONGODB_URI=mongodb://erd-mongodb:27017/erd-system -e REDIS_HOST=erd-redis -e REDIS_PORT=6379 -e FRONTEND_URL=http://210.92.92.18:2000 -e BASE_PATH=/erd -e JWT_SECRET=production-secret-change-me --restart unless-stopped erd-backend
+
 podman run -d --name erd-frontend --network erd-network -p 8085:80 --restart unless-stopped erd-frontend
 ```
 

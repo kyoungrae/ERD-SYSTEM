@@ -34,6 +34,7 @@ import { Plus, Download, Upload, ChevronLeft, ChevronRight, LogOut, User as User
 import { getLayoutedElements } from '../utils/layout';
 import { getForceLayoutedElements } from '../utils/forceLayout';
 import { generateSQLFromERD } from '../utils/sqlGenerator';
+import { copyToClipboard } from '../utils/clipboard';
 
 const nodeTypes: NodeTypes = {
     entity: EntityNode,
@@ -705,10 +706,14 @@ const ERDCanvasContent: React.FC = () => {
                     <div className="flex flex-col justify-center px-1 mr-2" title="클릭하여 ID 복사">
                         <span className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Project ID</span>
                         <button
-                            onClick={() => {
+                            onClick={async () => {
                                 if (currentProject?.id) {
-                                    navigator.clipboard.writeText(currentProject.id);
-                                    alert('프로젝트 ID가 복사되었습니다: ' + currentProject.id);
+                                    const success = await copyToClipboard(currentProject.id);
+                                    if (success) {
+                                        alert('프로젝트 ID가 복사되었습니다: ' + currentProject.id);
+                                    } else {
+                                        alert('복사에 실패했습니다. 직접 복사해주세요: ' + currentProject.id);
+                                    }
                                 }
                             }}
                             className="text-xs font-mono font-bold text-gray-700 hover:text-blue-600 transition-colors text-left"
